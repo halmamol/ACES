@@ -1,4 +1,4 @@
-ACES: AmBe Coincidence Event Selection for WCTE Experiment 
+# ACES: AmBe Coincidence Event Selection for WCTE Experiment 
 
 Requires of:
 - ROOT (works with ROOT 6.26.04)
