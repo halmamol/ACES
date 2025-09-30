@@ -1,6 +1,6 @@
 # ACES: AmBe Coincidence Event Selection for WCTE Experiment 
 
-Requires of:
+Requirements of:
 - ROOT (works with ROOT 6.26.04)
 - BONSAI (using WCTE version from https://github.com/WCTE/hk-BONSAI)
 
