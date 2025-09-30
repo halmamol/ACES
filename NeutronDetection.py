@@ -3,7 +3,7 @@ print("Importando librerias necesarias...")
 
 #import uproot
 import numpy as np
-#import matplotlib.pyplot as plt
+
 import pandas as pd
 import functions_spills
 import functions_analysis
@@ -92,13 +92,6 @@ event_number_branch = np.arange(0, N_events, 1)
 print("Searching prompt candidate events...")
 threshold_times_prompt = functions_spills.prompt_candidates_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, prompt_window, prompt_dead_time, prompt_nhits_min, prompt_nhits_max)
 
-#for event in threshold_times_prompt:
-#    t_in_list = threshold_times_prompt[event]  # List of (time_prompt, n_hits)
-#    threshold_times_prompt[event] = [
-#        (t_in, n_hits, functions_analysis.time_RMS_fun_time(times_per_event[event], t_in, prompt_window))
-#        for (t_in, n_hits) in t_in_list
-#        if prompt_t_rms_min <= functions_analysis.time_RMS_fun_time(times_per_event[event], t_in, prompt_window) <= prompt_t_rms_max
-#    ]
 
 for event, candidates in threshold_times_prompt.items():
     times_event = times_per_event[event]
@@ -142,42 +135,6 @@ print("Neutron candidates", sum(len(v) for v in neutron_dict.values()))
 
 print("Saving candidate neutron events on CSV...")
 
-"""
-neutron_candidates = []
-
-for event_number, times in neutron_dict.items():
-    
-    prompt_candidates = threshold_times_prompt.get(event_number, [])  # List of (time_prompt, n_hits, prompt_trms)
-
-    prompt_nhits_map = {
-    float(t): (
-        float(n[0]) if isinstance(n, list) else float(n),
-        float(trms[0]) if isinstance(trms, list) else float(trms),
-        float(x[0]) if isinstance(x, list) else float(x),
-        float(y[0]) if isinstance(y, list) else float(y),
-        float(z[0]) if isinstance(z, list) else float(z)
-    )
-    for t, n, trms, _, _, x, y, z in prompt_candidates
-    }
-    for start_time, neutron_pairs in times.items():
-        prompt_data = prompt_nhits_map.get(float(start_time), (None, None))
-        prompt_nhits_val, prompt_trms_val, prompt_x_val, prompt_y_val, prompt_z_val = prompt_data
-        for delayed_time, delayed_nhits, delayed_x, delayed_y, delayed_z in neutron_pairs:
-            neutron_candidates.append({
-                'event_number': event_number,
-                'prompt_time': float(start_time),
-                'prompt_nhits': prompt_nhits_val,
-                'prompt_trms': prompt_trms_val,
-                'prompt_x': prompt_x_val,
-                'prompt_y': prompt_y_val,
-                'prompt_z': prompt_z_val,
-                'delayed_time': float(delayed_time),
-                'delayed_nhits': float(delayed_nhits) if not isinstance(delayed_nhits, list) else float(delayed_nhits[0]),
-                'delayed_x': float(delayed_x) if not isinstance(delayed_x, list) else float(delayed_x[0]),
-                'delayed_y': float(delayed_y) if not isinstance(delayed_y, list) else float(delayed_y[0]),
-                'delayed_z': float(delayed_z) if not isinstance(delayed_z, list) else float(delayed_z[0])
-            })
-"""
 #df_neutron_candidates = pd.DataFrame(neutron_dict)
 #df_neutron_candidates = pd.DataFrame(neutron_candidates)
 df_neutron_candidates = pd.concat(
