@@ -1,12 +1,15 @@
-#import uproot
-#import awkward as ak
-#import matplotlib.pyplot as plt
+import uproot
+import awkward as ak
+import matplotlib.pyplot as plt
 
 import numpy as np
 import pandas as pd  
 import json
+import sys
+import os
+sys.path.append(os.path.abspath("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk"))
 
-import functions_bonsai
+# import ACES.functions_bonsai
 
 
 def spill_nHitsTT(times_branch_event_arg, threshold_inf, window, death_window, charge_branch_event = [], threshold_sup = np.inf):
@@ -341,7 +344,7 @@ def initial_treatment(tree):
     mpmt_slot_branch_clean = mpmt_slot_branch[valid_mask]
     pmt_position_clean = pmt_position[valid_mask]
 
-    mpmt_map = read_mpmt_offsets("/scratch/halmazan/WCTE/WCTECoincidence_Analysis/Complete_analysis/mpmt_tof_pos1.json")
+    mpmt_map = read_mpmt_offsets("/mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/mpmt_tof_map/mpmt_tof_pos1525.json")
     corrections = correction_TOF(mpmt_map, mpmt_slot_branch_clean, pmt_position_clean)
     corrected_times = times_branch_clean - corrections
     
@@ -445,148 +448,148 @@ def prompt_candidates(event_branch, times_branch_arg, window_sliding, window_cle
 
     return theshold_times
 
-def prompt_candidates_wBonsai(
-    event_branch,
-    times_branch_arg,
-    charge_branch_arg,
-    mpmt_branch_arg,
-    pmt_branch_arg,
-    window_sliding,
-    window_clean,
-    threshold_inf,
-    threshold_sup,
-):
-    """
-    For each event, find "prompt" candidates using spill_nHitsTT, enforce clean
-    windows before/after, and return (per event) a list of prompt entries that
-    include the trigger time, number of hits in the prompt window, and the charge
-    and mPMT-id arrays for the hits inside that window.
+# def prompt_candidates_wBonsai(
+#     event_branch,
+#     times_branch_arg,
+#     charge_branch_arg,
+#     mpmt_branch_arg,
+#     pmt_branch_arg,
+#     window_sliding,
+#     window_clean,
+#     threshold_inf,
+#     threshold_sup,
+# ):
+#     """
+#     For each event, find "prompt" candidates using spill_nHitsTT, enforce clean
+#     windows before/after, and return (per event) a list of prompt entries that
+#     include the trigger time, number of hits in the prompt window, and the charge
+#     and mPMT-id arrays for the hits inside that window.
 
-    Returns:
-        dict:
-            {
-              event_id: [
-                {
-                  "time": float,            # trigger time (prompt)
-                  "n_hits": int,            # number of hits in [time, time+window_sliding)
-                  "charge": np.ndarray,     # charges of hits in the prompt window
-                  "mpmt_id": np.ndarray,    # mPMT ids of hits in the prompt window
-                  # Optional: you may also add "indices" or "times" if needed
-                },
-                ...
-              ],
-              ...
-            }
-    """
-    import numpy as np
+#     Returns:
+#         dict:
+#             {
+#               event_id: [
+#                 {
+#                   "time": float,            # trigger time (prompt)
+#                   "n_hits": int,            # number of hits in [time, time+window_sliding)
+#                   "charge": np.ndarray,     # charges of hits in the prompt window
+#                   "mpmt_id": np.ndarray,    # mPMT ids of hits in the prompt window
+#                   # Optional: you may also add "indices" or "times" if needed
+#                 },
+#                 ...
+#               ],
+#               ...
+#             }
+#     """
+#     import numpy as np
+# 
+#     def prompt_candidates_event(
+#         times_event: np.ndarray,
+#         charge_event: np.ndarray,
+#         mpmt_event: np.ndarray,
+#         pmt_event: np.ndarray,
+#         window_sliding: float,
+#         window_clean: float,
+#         threshold_inf: float,
+#         threshold_sup: float,
+#     ):
+#         # Sanity: arrays must be aligned
+#         if not (len(times_event) == len(charge_event) == len(mpmt_event) == len(pmt_event)):
+#             raise ValueError(
+#                 f"Arrays have mismatched lengths (times={len(times_event)}, "
+#                 f"charge={len(charge_event)}, mpmt={len(mpmt_event)}, pmt={len(pmt_event)})"
+#             )
 
-    def prompt_candidates_event(
-        times_event: np.ndarray,
-        charge_event: np.ndarray,
-        mpmt_event: np.ndarray,
-        pmt_event: np.ndarray,
-        window_sliding: float,
-        window_clean: float,
-        threshold_inf: float,
-        threshold_sup: float,
-    ):
-        # Sanity: arrays must be aligned
-        if not (len(times_event) == len(charge_event) == len(mpmt_event) == len(pmt_event)):
-            raise ValueError(
-                f"Arrays have mismatched lengths (times={len(times_event)}, "
-                f"charge={len(charge_event)}, mpmt={len(mpmt_event)}, pmt={len(pmt_event)})"
-            )
+#         valid_thresholds = []
 
-        valid_thresholds = []
+#         # Find candidate trigger times
+#         threshold_list, _, _ = spill_nHitsTT(
+#             times_event,
+#             threshold_inf,
+#             window_sliding,
+#             0,
+#             threshold_sup=threshold_sup,
+#         )
 
-        # Find candidate trigger times
-        threshold_list, _, _ = spill_nHitsTT(
-            times_event,
-            threshold_inf,
-            window_sliding,
-            0,
-            threshold_sup=threshold_sup,
-        )
+#         for time_prompt in threshold_list:
+#             # Clean windows before and after the candidate
+#             mask_clean_1 = (times_event >= time_prompt - window_clean) & (times_event < time_prompt)
+#             mask_clean_2 = (times_event > time_prompt + window_sliding) & (
+#                 times_event < time_prompt + window_sliding + window_clean
+#             )
 
-        for time_prompt in threshold_list:
-            # Clean windows before and after the candidate
-            mask_clean_1 = (times_event >= time_prompt - window_clean) & (times_event < time_prompt)
-            mask_clean_2 = (times_event > time_prompt + window_sliding) & (
-                times_event < time_prompt + window_sliding + window_clean
-            )
+#             if mask_clean_1.sum() != 0:
+#                 clean_list_1, _, _ = spill_nHitsTT(
+#                     times_event[mask_clean_1], threshold_inf, window_sliding, 0, threshold_sup=threshold_sup
+#                 )
+#             else:
+#                 clean_list_1 = []
 
-            if mask_clean_1.sum() != 0:
-                clean_list_1, _, _ = spill_nHitsTT(
-                    times_event[mask_clean_1], threshold_inf, window_sliding, 0, threshold_sup=threshold_sup
-                )
-            else:
-                clean_list_1 = []
+#             if mask_clean_2.sum() != 0:
+#                 clean_list_2, _, _ = spill_nHitsTT(
+#                     times_event[mask_clean_2], threshold_inf, window_sliding, 0, threshold_sup=threshold_sup
+#                 )
+#             else:
+#                 clean_list_2 = []
 
-            if mask_clean_2.sum() != 0:
-                clean_list_2, _, _ = spill_nHitsTT(
-                    times_event[mask_clean_2], threshold_inf, window_sliding, 0, threshold_sup=threshold_sup
-                )
-            else:
-                clean_list_2 = []
-
-            # Accept only if no other signal candidate too close
-            if len(clean_list_1) + len(clean_list_2) == 0:
-                mask_hits = (times_event >= time_prompt) & (times_event < time_prompt + window_sliding)
-                n_hits_here = int(mask_hits.sum())
-                if n_hits_here == 0:
-                    continue
+#             # Accept only if no other signal candidate too close
+#             if len(clean_list_1) + len(clean_list_2) == 0:
+#                 mask_hits = (times_event >= time_prompt) & (times_event < time_prompt + window_sliding)
+#                 n_hits_here = int(mask_hits.sum())
+#                 if n_hits_here == 0:
+#                     continue
                 
-                times_in_prompt = times_event[mask_hits]
-                charges_in_prompt = charge_event[mask_hits]
-                mpmt_in_prompt = mpmt_event[mask_hits]
-                pmt_in_prompt = pmt_event[mask_hits]
+#                 times_in_prompt = times_event[mask_hits]
+#                 charges_in_prompt = charge_event[mask_hits]
+#                 mpmt_in_prompt = mpmt_event[mask_hits]
+#                 pmt_in_prompt = pmt_event[mask_hits]
 
-                vertex = functions_bonsai.run_BONSAI_candidate(times_in_prompt, charges_in_prompt, mpmt_in_prompt, pmt_in_prompt)
+#                 vertex = functions_bonsai.run_BONSAI_candidate(times_in_prompt, charges_in_prompt, mpmt_in_prompt, pmt_in_prompt)
 
-                valid_thresholds.append(
-                    {
-                        "time": float(time_prompt),
-                        "n_hits": n_hits_here,
-                        "charge": charges_in_prompt,
-                        "mpmt_id": mpmt_in_prompt,
-                        "pmt_id": pmt_in_prompt,
-                        "vertex_x": vertex["x"][0],
-                        "vertex_y": vertex["y"][0],
-                        "vertex_z": vertex["z"][0],
-                        # If useful, you can also include:
-                        # "indices": np.where(mask_hits)[0],
-                        # "times": times_event[mask_hits],
-                    }
-                )
+#                 valid_thresholds.append(
+#                     {
+#                         "time": float(time_prompt),
+#                         "n_hits": n_hits_here,
+#                         "charge": charges_in_prompt,
+#                         "mpmt_id": mpmt_in_prompt,
+#                         "pmt_id": pmt_in_prompt,
+#                         "vertex_x": vertex["x"][0],
+#                         "vertex_y": vertex["y"][0],
+#                         "vertex_z": vertex["z"][0],
+#                         # If useful, you can also include:
+#                         # "indices": np.where(mask_hits)[0],
+#                         # "times": times_event[mask_hits],
+#                     }
+#                 )
 
-        return valid_thresholds
+#         return valid_thresholds
 
-    threshold_times = {}
+#     threshold_times = {}
 
-    for event in event_branch:
-        if event % 1000 == 0:
-            print(f"Searching prompt candidates on event {event}...")
+#     for event in event_branch:
+#         if event % 1000 == 0:
+#             print(f"Searching prompt candidates on event {event}...")
 
-        times_event = times_branch_arg[event]
-        charge_event = charge_branch_arg[event]
-        mpmt_event = mpmt_branch_arg[event]
-        pmt_event = pmt_branch_arg[event]
+#         times_event = times_branch_arg[event]
+#         charge_event = charge_branch_arg[event]
+#         mpmt_event = mpmt_branch_arg[event]
+#         pmt_event = pmt_branch_arg[event]
 
-        results = prompt_candidates_event(
-            times_event,
-            charge_event,
-            mpmt_event,
-            pmt_event,
-            window_sliding,
-            window_clean,
-            threshold_inf,
-            threshold_sup,
-        )
+#         results = prompt_candidates_event(
+#             times_event,
+#             charge_event,
+#             mpmt_event,
+#             pmt_event,
+#             window_sliding,
+#             window_clean,
+#             threshold_inf,
+#             threshold_sup,
+#         )
 
-        if len(results) != 0:
-            threshold_times[event] = results
+#         if len(results) != 0:
+#             threshold_times[event] = results
 
-    return threshold_times
+#     return threshold_times
 
 
 def neutron_detection(event_branch, times_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup = np.inf, window_prompt = 100):
@@ -630,91 +633,91 @@ def neutron_detection(event_branch, times_branch_event_arg, threshold_times, win
 
     return dict_neutrons
 
-def neutron_detection_wBonsai(event_branch, times_branch_arg, charge_branch_arg, mpmt_branch_arg, pmt_branch_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup = np.inf, window_prompt = 100):
+# def neutron_detection_wBonsai(event_branch, times_branch_arg, charge_branch_arg, mpmt_branch_arg, pmt_branch_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup = np.inf, window_prompt = 100):
 
-    def neutron_detection_event(event_number, times_branch_event_arg, charge_branch_event_arg, mpmt_branch_event_arg, pmt_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup, window_prompt):
+#     def neutron_detection_event(event_number, times_branch_event_arg, charge_branch_event_arg, mpmt_branch_event_arg, pmt_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup, window_prompt):
         
-        dict_neutrons_event = {}
-        valid_thresholds = []
-        last_prompt = None
+#         dict_neutrons_event = {}
+#         valid_thresholds = []
+#         last_prompt = None
 
-        #for time_prompt in threshold_times:
-        for time_prompt, nhits_prompt, trms_prompt,_ , _, _, x_prompt, y_prompt, z_prompt  in threshold_times:    
-            if last_prompt is not None and (time_prompt-last_prompt) < (window_sliding + window_prompt):
-                continue
+#         #for time_prompt in threshold_times:
+#         for time_prompt, nhits_prompt, trms_prompt,_ , _, _, x_prompt, y_prompt, z_prompt  in threshold_times:    
+#             if last_prompt is not None and (time_prompt-last_prompt) < (window_sliding + window_prompt):
+#                 continue
 
-            mask = (times_branch_event_arg >= time_prompt + window_prompt) & (times_branch_event_arg < time_prompt + window_prompt + window_sliding)
+#             mask = (times_branch_event_arg >= time_prompt + window_prompt) & (times_branch_event_arg < time_prompt + window_prompt + window_sliding)
             
-            if mask.sum() == 0:
-                continue
+#             if mask.sum() == 0:
+#                 continue
 
-            neutron_candidates, _, neutron_nhits = spill_nHitsTT(times_branch_event_arg[mask], threshold_inf, window_neutron, 0, threshold_sup=threshold_sup)
+#             neutron_candidates, _, neutron_nhits = spill_nHitsTT(times_branch_event_arg[mask], threshold_inf, window_neutron, 0, threshold_sup=threshold_sup)
             
-            #for time_delayed in neutron_candidates:
-            for i in range(len(neutron_candidates)):
-                time_delayed = neutron_candidates[i]
-                delayed_nhits = neutron_nhits[i]
-                mask_delayed = (times_branch_event_arg >= time_delayed) & (times_branch_event_arg < time_delayed + window_sliding)
-                #neutron_nhits = mask_delayed.sum()
+#             #for time_delayed in neutron_candidates:
+#             for i in range(len(neutron_candidates)):
+#                 time_delayed = neutron_candidates[i]
+#                 delayed_nhits = neutron_nhits[i]
+#                 mask_delayed = (times_branch_event_arg >= time_delayed) & (times_branch_event_arg < time_delayed + window_sliding)
+#                 #neutron_nhits = mask_delayed.sum()
 
-                times_in_delayed = times_branch_event_arg[mask_delayed]
-                charges_in_delayed = charge_branch_event_arg[mask_delayed]
-                mpmt_in_delayed = mpmt_branch_event_arg[mask_delayed]
-                pmt_in_delayed = pmt_branch_event_arg[mask_delayed]
+#                 times_in_delayed = times_branch_event_arg[mask_delayed]
+#                 charges_in_delayed = charge_branch_event_arg[mask_delayed]
+#                 mpmt_in_delayed = mpmt_branch_event_arg[mask_delayed]
+#                 pmt_in_delayed = pmt_branch_event_arg[mask_delayed]
                 
-                vertex = functions_bonsai.run_BONSAI_candidate(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
+#                 vertex = functions_bonsai.run_BONSAI_candidate(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
 
-                valid_thresholds.append(
-                    {
-                        'event_number': event_number,
-                        'prompt_nhits': nhits_prompt,
-                        'prompt_time': float(time_prompt),
-                        'prompt_trms': trms_prompt,
-                        'prompt_x': x_prompt,
-                        'prompt_y': y_prompt,
-                        'prompt_z': z_prompt,
-                        "delayed_time": float(time_delayed),
-                        "delayed_nhits": delayed_nhits,
-                        "delayed_x": vertex["x"][0],
-                        "delayed_y": vertex["y"][0],
-                        "delayed_z": vertex["z"][0],
-                    }
-                )
+#                 valid_thresholds.append(
+#                     {
+#                         'event_number': event_number,
+#                         'prompt_nhits': nhits_prompt,
+#                         'prompt_time': float(time_prompt),
+#                         'prompt_trms': trms_prompt,
+#                         'prompt_x': x_prompt,
+#                         'prompt_y': y_prompt,
+#                         'prompt_z': z_prompt,
+#                         "delayed_time": float(time_delayed),
+#                         "delayed_nhits": delayed_nhits,
+#                         "delayed_x": vertex["x"][0],
+#                         "delayed_y": vertex["y"][0],
+#                         "delayed_z": vertex["z"][0],
+#                     }
+#                 )
 
-                #
-                #'prompt_time': float(start_time),
-                #'prompt_nhits': prompt_nhits_val,
-                #'prompt_trms': prompt_trms_val,
-                #'prompt_x': prompt_x_val,
-                #'prompt_y': prompt_y_val,
-                #'prompt_z': prompt_z_val,
-                #'delayed_time': float(delayed_time),
-                #'delayed_nhits': float(delayed_nhits) if not isinstance(delayed_nhits, list) else float(delayed_nhits[0]),
-                #'delayed_x': float(delayed_x) if not isinstance(delayed_x, list) else float(delayed_x[0]),
-                #'delayed_y': float(delayed_y) if not isinstance(delayed_y, list) else float(delayed_y[0]),
-                #'delayed_z': float(delayed_z) if not isinstance(delayed_z, list) else float(delayed_z[0])
+#                 #
+#                 #'prompt_time': float(start_time),
+#                 #'prompt_nhits': prompt_nhits_val,
+#                 #'prompt_trms': prompt_trms_val,
+#                 #'prompt_x': prompt_x_val,
+#                 #'prompt_y': prompt_y_val,
+#                 #'prompt_z': prompt_z_val,
+#                 #'delayed_time': float(delayed_time),
+#                 #'delayed_nhits': float(delayed_nhits) if not isinstance(delayed_nhits, list) else float(delayed_nhits[0]),
+#                 #'delayed_x': float(delayed_x) if not isinstance(delayed_x, list) else float(delayed_x[0]),
+#                 #'delayed_y': float(delayed_y) if not isinstance(delayed_y, list) else float(delayed_y[0]),
+#                 #'delayed_z': float(delayed_z) if not isinstance(delayed_z, list) else float(delayed_z[0])
 
-            #if len(neutron_candidates) != 0:
-            #    # Store as list of tuples (neutron_time, neutron_nhits)
-            #    dict_neutrons_event[time_prompt] = list(zip(neutron_candidates, neutron_nhits, vertex["x"][0], vertex["y"][0],vertex["z"][0]))#[(nt, neutron_nhits) for nt in neutron_candidates]
-            #    last_prompt = time_prompt
+#             #if len(neutron_candidates) != 0:
+#             #    # Store as list of tuples (neutron_time, neutron_nhits)
+#             #    dict_neutrons_event[time_prompt] = list(zip(neutron_candidates, neutron_nhits, vertex["x"][0], vertex["y"][0],vertex["z"][0]))#[(nt, neutron_nhits) for nt in neutron_candidates]
+#             #    last_prompt = time_prompt
 
-        return valid_thresholds
+#         return valid_thresholds
     
-    dict_neutrons = {}
-    for event in event_branch:
-        if event % 1000 == 0:
-            print(f"Searching neutron coincidences on event {event}...")
-        if event in threshold_times:
-            if len(threshold_times[event]) == 0:
-                continue 
-            results = neutron_detection_event(event, times_branch_arg[event], charge_branch_arg[event], mpmt_branch_arg[event], pmt_branch_arg[event], threshold_times[event], window_sliding, window_neutron, threshold_inf, threshold_sup, window_prompt)
-            if len(results) != 0:
-                dict_neutrons[event] = results
+#     dict_neutrons = {}
+#     for event in event_branch:
+#         if event % 1000 == 0:
+#             print(f"Searching neutron coincidences on event {event}...")
+#         if event in threshold_times:
+#             if len(threshold_times[event]) == 0:
+#                 continue 
+#             results = neutron_detection_event(event, times_branch_arg[event], charge_branch_arg[event], mpmt_branch_arg[event], pmt_branch_arg[event], threshold_times[event], window_sliding, window_neutron, threshold_inf, threshold_sup, window_prompt)
+#             if len(results) != 0:
+#                 dict_neutrons[event] = results
 
-    return dict_neutrons
-        #else:
-            #print(f"Event {event} has no threshold times, skipping neutron detection.")
+#     return dict_neutrons
+#         #else:
+#             #print(f"Event {event} has no threshold times, skipping neutron detection.")
 
 
 def multiple_partition(root_files):

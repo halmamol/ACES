@@ -4,6 +4,9 @@ import uproot
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import sys
+import os
+sys.path.append(os.path.abspath("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk"))
 import functions_spills
 import glob
 import os
@@ -25,15 +28,15 @@ args = parser.parse_args()
 partition = args.partition
 
 # Other arguments for the analysis
-run_number = "2389"  # Run number
-nhits_threshold = 300  # Threshold for nHits
-nhits_window = 5000  # Window for nHits
-death_time = 6000  # Death time for nHits
+run_number = "1766"   # Run number
+nhits_threshold = 300 # Threshold for nHits
+nhits_window = 5000   # Window for nHits
+death_time = 6000     # Death time for nHits
 
 # Paths for files #############################################################################################
-root_dir = f"/scratch/halmazan/WCTE/files/data/{run_number}/"
+root_dir = f"/mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/raw_data/{run_number}/"
 root_file_path = f"{root_dir}WCTE_offline_R{run_number}S0P{partition}.root"
-output_path = f"//scratch/halmazan/WCTE/files/data/filtered_files/"
+output_path = f"/mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/processed_wcte_data"
 
 # Showing results
 if partition == "all":
