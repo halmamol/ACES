@@ -5,7 +5,7 @@ print("Importando librerias necesarias...")
 import numpy as np
 
 import pandas as pd
-import functions_spills
+import functions_coincidence
 import functions_analysis
 import glob
 import os
@@ -48,10 +48,10 @@ output_path = "/scratch/halmazan/WCTE/files/data/"
 
 prompt_window = 1500  # Window for prompt candidates
 prompt_dead_time = 200  # Death time for prompt candidates
-prompt_t_rms_min = 200
-prompt_t_rms_max = 400
-prompt_nhits_min = 150
-prompt_nhits_max = 300
+prompt_t_rms_min = 200 # Minimum RMS time for prompt candidates
+prompt_t_rms_max = 400 # Maximum RMS time for prompt candidates
+prompt_nhits_min = 150 # Minimum number of hits for prompt candidates
+prompt_nhits_max = 300 # Maximum number of hits for prompt candidates
 coincidence_window = 150000  # Window for coincidence search
 delayed_window = 100  # Window for delayed candidates
 delayed_nhits_min = 10  # Minimum number of hits for delayed candidates
@@ -90,7 +90,7 @@ event_number_branch = np.arange(0, N_events, 1)
 # Prompt candidates detection ###########################################################################################################
 
 print("Searching prompt candidate events...")
-threshold_times_prompt = functions_spills.prompt_candidates_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, prompt_window, prompt_dead_time, prompt_nhits_min, prompt_nhits_max)
+threshold_times_prompt = functions_coincidence.prompt_candidates_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, prompt_window, prompt_dead_time, prompt_nhits_min, prompt_nhits_max)
 
 
 for event, candidates in threshold_times_prompt.items():
@@ -125,7 +125,7 @@ print("Prompt candidates found in run.")
 # Neutron detection ###########################################################################################################
 
 print("Searching for neutron events...")
-neutron_dict = functions_spills.neutron_detection_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
+neutron_dict = functions_coincidence.neutron_detection_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
 
 print("Prompt candidates", sum(len(v) for v in threshold_times_prompt.values()))
 print("Neutron candidates", sum(len(v) for v in neutron_dict.values()))
