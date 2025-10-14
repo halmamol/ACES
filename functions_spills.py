@@ -90,6 +90,7 @@ def repeat_spills_nHits(event_number_branch, times_branch_sorted, threshold, win
 def repeat_spills_nHits_with_channels(
     event_number_branch,
     times_branch_sorted_TOF,
+    times_daq_branch_sorted,
     charge_branch_sorted,
     mpmt_id_branch_sorted,
     pmt_id_branch_sorted,
@@ -111,6 +112,7 @@ def repeat_spills_nHits_with_channels(
     import numpy as np
 
     times_branch_modified_TOF = []
+    times_daq_branch_modified = []
     charge_branch_modified = []
     mpmt_id_branch_modified = []
     pmt_id_branch_modified = []  
@@ -122,6 +124,7 @@ def repeat_spills_nHits_with_channels(
             print(f"Filtering nHits event {event}...")
 
         t_orig = times_branch_sorted_TOF[event]
+        t_daq_orig = times_daq_branch_sorted[event]
         c_orig = charge_branch_sorted[event]
         m_orig = mpmt_id_branch_sorted[event]
         p_orig = pmt_id_branch_sorted[event]
@@ -172,6 +175,7 @@ def repeat_spills_nHits_with_channels(
 
         # Append filtered arrays
         times_branch_modified_TOF.append(t_orig[keep_mask])
+        times_daq_branch_modified.append(t_daq_orig[keep_mask])
         charge_branch_modified.append(c_orig[keep_mask])
         mpmt_id_branch_modified.append(m_orig[keep_mask])
         pmt_id_branch_modified.append(p_orig[keep_mask])  # Not returned but could be if needed
@@ -184,6 +188,7 @@ def repeat_spills_nHits_with_channels(
 
     return (
         times_branch_modified_TOF,
+        times_daq_branch_modified,
         charge_branch_modified,
         mpmt_id_branch_modified,
         pmt_id_branch_modified,
@@ -325,6 +330,7 @@ def correction_TOF(mpmt_map, mpmt_slot_branch, pmt_position, max_slot = 106, max
 def initial_treatment(tree):
 
     times_branch = tree["hit_pmt_calibrated_times"].array()
+    times_daq_branch_evt = np.array(tree["window_time"].array())
     charge_branch = tree["hit_pmt_charges"].array()
     mpmt_slot_branch = tree["hit_mpmt_slot_ids"].array()
     pmt_position = tree["hit_pmt_position_ids"].array()
@@ -332,11 +338,14 @@ def initial_treatment(tree):
     hit_cards_id = tree["hit_mpmt_card_ids"].array()
     has_time_cte = tree["hit_pmt_has_time_constant"].array()
 
+    times_daq_branch = times_branch + times_daq_branch_evt
+
     # Crear una máscara booleana por evento donde ambos valores sean >= 0
     valid_mask = (mpmt_slot_branch >= 0) & (pmt_position >= 0) & (charge_branch < 1e4) & (hit_cards_id < 120) &  (has_time_cte != 0)
 
     # Aplicar la máscara a cada rama para eliminar los hits inválidos
     times_branch_clean = times_branch[valid_mask]
+    times_daq_branch_clean = times_daq_branch[valid_mask]
     charge_branch_clean = charge_branch[valid_mask]
     mpmt_slot_branch_clean = mpmt_slot_branch[valid_mask]
     pmt_position_clean = pmt_position[valid_mask]
@@ -351,18 +360,20 @@ def initial_treatment(tree):
     # Usar los índices para reordenar todos los branches
     times_sorted_TOF = corrected_times[sorted_idx]
     times_sorted = times_branch_clean[sorted_idx]
+    times_daq_sorted = times_daq_branch_clean[sorted_idx]
     charges_sorted = charge_branch_clean[sorted_idx]
     mpmt_sorted = mpmt_slot_branch_clean[sorted_idx]
     pmt_position_sorted = pmt_position_clean[sorted_idx]
 
     # Convertir a listas de NumPy arrays
     times_sorted_np = [np.array(evt) for evt in times_sorted]
+    times_daq_sorted_np = [np.array(evt) for evt in times_daq_sorted]
     times_sorted_TOF_np = [np.array(evt) for evt in times_sorted_TOF]
     charges_sorted_np = [np.array(evt) for evt in charges_sorted]
     mpmt_sorted_np = [np.array(evt) for evt in mpmt_sorted]
     pmt_position_sorted_np = [np.array(evt) for evt in pmt_position_sorted]
 
-    return times_sorted_np, times_sorted_TOF_np, charges_sorted_np, mpmt_sorted_np, pmt_position_sorted_np, event_number_branch
+    return times_sorted_np, times_daq_sorted_np, times_sorted_TOF_np, charges_sorted_np, mpmt_sorted_np, pmt_position_sorted_np, event_number_branch
 
 def delete_indices_list(list_to_delete, indices):
     """List to delete es la lista de listas incial
@@ -405,6 +416,7 @@ def counting_nHits_window(event_number_branch, times_branch, bin_window):
 def multiple_partition(root_files):
 
     times_branch_sorted = []
+    times_daq_branch_sorted = []
     times_branch_sorted_TOF = []
     charge_branch_sorted = []
     mpmt_id_branch_sorted = []
@@ -420,13 +432,14 @@ def multiple_partition(root_files):
         file = uproot.open(file_path)
         tree = file["WCTEReadoutWindows"]
 
-        times_branch_sorted_i, times_branch_sorted_TOF_i, charge_branch_sorted_i, mpmt_id_branch_sorted_i, pmt_id_branch_sorted_i, event_number_branch_i = initial_treatment(tree)
+        times_branch_sorted_i, times_daq_branch_sorted_i, times_branch_sorted_TOF_i, charge_branch_sorted_i, mpmt_id_branch_sorted_i, pmt_id_branch_sorted_i, event_number_branch_i = initial_treatment(tree)
         
         dir_event_partition[int(file_path.split("P")[-1].split(".")[0])] = len(event_number_branch_i)
         # Ajustar los event_numbers con offset para que no se repitan
         new_event_numbers = [i + event_offset for i in event_number_branch_i]
 
         times_branch_sorted.extend(times_branch_sorted_i)
+        times_daq_branch_sorted.extend(times_daq_branch_sorted_i)
         times_branch_sorted_TOF.extend(times_branch_sorted_TOF_i)
         charge_branch_sorted.extend(charge_branch_sorted_i)
         mpmt_id_branch_sorted.extend(mpmt_id_branch_sorted_i)
@@ -436,4 +449,4 @@ def multiple_partition(root_files):
         # Actualizar offset para el siguiente archivo
         event_offset += tree.num_entries
 
-    return times_branch_sorted, times_branch_sorted_TOF, charge_branch_sorted, mpmt_id_branch_sorted, pmt_id_branch_sorted, event_number_branch, dir_event_partition
+    return times_branch_sorted, times_daq_branch_sorted, times_branch_sorted_TOF, charge_branch_sorted, mpmt_id_branch_sorted, pmt_id_branch_sorted, event_number_branch, dir_event_partition

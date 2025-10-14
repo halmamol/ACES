@@ -46,7 +46,7 @@ if partition == "all":
 
     print(f"Found {len(root_files)} ROOT files.")
 
-    times_branch_sorted, times_branch_sorted_TOF, charge_branch_sorted, mpmt_id_branch_sorted, pmt_id_branch_sorted, event_number_branch, _ = functions_spills.multiple_partition(root_files)
+    times_branch_sorted, times_daq_branch_sorted, times_branch_sorted_TOF, charge_branch_sorted, mpmt_id_branch_sorted, pmt_id_branch_sorted, event_number_branch, _ = functions_spills.multiple_partition(root_files)
 
     print("Runs loaded.")
     N_events = max(event_number_branch) + 1
@@ -58,6 +58,7 @@ print(f"Applying filter for Run {run_number}...")
 
 (
     times_branch_modified_TOF,
+    times_daq_branch_modified,
     charge_branch_modified,
     mpmt_id_branch_modified,
     pmt_id_branch_modified,
@@ -67,6 +68,7 @@ print(f"Applying filter for Run {run_number}...")
     event_number_branch=event_number_branch,
     times_branch_sorted_TOF=times_branch_sorted,
     #times_branch_sorted_TOF=times_branch_sorted_TOF,
+    times_daq_branch_sorted=times_daq_branch_sorted,
     charge_branch_sorted=charge_branch_sorted,
     mpmt_id_branch_sorted=mpmt_id_branch_sorted,
     pmt_id_branch_sorted=pmt_id_branch_sorted,
@@ -98,6 +100,7 @@ def flatten_values_and_offsets(list_of_arrays):
 
 # Build a single consolidated payload and save into ONE file ###########################################################
 times_values, times_offsets = flatten_values_and_offsets(times_branch_modified_TOF)
+times_daq_values, times_daq_offsets = flatten_values_and_offsets(times_daq_branch_modified)
 charge_values, charge_offsets = flatten_values_and_offsets(charge_branch_modified)
 mpmt_values, mpmt_offsets = flatten_values_and_offsets(mpmt_id_branch_modified)
 pmt_values, pmt_offsets = flatten_values_and_offsets(pmt_id_branch_modified)
@@ -113,6 +116,10 @@ payload = {
         "values": times_values,
         "offsets": times_offsets,
     },
+    "times_daq_TOF": {
+        "values": times_daq_values,
+        "offsets": times_daq_offsets,
+    },
     "charge": {
         "values": charge_values,
         "offsets": charge_offsets,
@@ -127,8 +134,8 @@ payload = {
     },
 }
 
-with open(f'{output_path}filtered_file_{run_number}.pkl', 'wb') as f:
+with open(f'{output_path}filtered_file_daqtime_{run_number}.pkl', 'wb') as f:
     pickle.dump(payload, f)
 
 print(f"Saved single consolidated file:")
-print(f" - {output_path}filtered_file_{run_number}.pkl (contains times_TOF, charge, mpmt_id, metadata)")
+print(f" - {output_path}filtered_file_daqtime_{run_number}.pkl (contains times_TOF, charge, mpmt_id, metadata)")
