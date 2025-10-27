@@ -43,7 +43,7 @@ parser.add_argument(
 )
 
 # Arguments for Analysis 
-run_number = "2389"  # Run number
+run_number = "2386"  # Run number
 output_path = "/scratch/halmazan/WCTE/files/data/"
 
 # Parameters for Candidate Detection
@@ -61,12 +61,13 @@ delayed_nhits_max = 30  # Maximum number of hits for delayed candidates
 nBG = 10 # Number of accidental windows to search
 deltat_vp = 1000000 #ms Time difference for accidental search
 
-print("Opening: ", f'{output_path}filtered_files/filtered_file_{run_number}.pkl')
-print("Output saved in: ", f'{output_path}AmBeCandidates/neutron_candidates_{run_number}.csv')
+print("Opening Files...")
 
 with open(f'{output_path}filtered_files/filtered_file_daqtime_{run_number}.pkl', 'rb') as f:
 #    data = pickle.load(f)
     data = Numpy2to1Unpickler(f).load()
+
+neutron_df = pd.read_csv(f'{output_path}AmBeCandidates/neutron_candidates_{run_number}_timestest.csv')
 
 times_vals = data["times_TOF"]["values"]
 times_offs = data["times_TOF"]["offsets"]
@@ -123,96 +124,8 @@ print("Event times concatenated.")
 
 event_number_branch = np.arange(0, N_events, 1)
 
-# Prompt candidates detection ###########################################################################################################
-
-print("Searching prompt candidate events...")
-threshold_times_prompt = functions_coincidence.prompt_candidates_wBonsai(times_run, charge_run, mpmt_run, pmt_run, prompt_window, prompt_dead_time, prompt_nhits_min, prompt_nhits_max)
-print(f"Total prompt candidate events found: {len(threshold_times_prompt)}")
-#print(f"Total promp candidates found in run: {sum(len(v) for v in threshold_times_prompt.values())}")
-
-filtered = []
-for cand in threshold_times_prompt:
-    
-    if isinstance(cand, dict):
-        t_in = cand["time"]
-        n_hits = cand["n_hits"]
-        charge_arr = cand["charge"]
-        mpmt_arr = cand["mpmt_id"]
-        pmt_arr = cand["pmt_id"]
-        x_arr = cand["vertex_x"]  
-        y_arr = cand["vertex_y"]
-        z_arr = cand["vertex_z"]
-    else:
-        # If you only ever have tuples, you can't include charge/mpmt here
-        t_in, n_hits = cand
-        charge_arr = None
-        mpmt_arr = None
-        pmt_arr = None
-
-    t_rms = functions_analysis.time_RMS_fun_time(times_run, t_in, prompt_window)
-    #print(f'Value of t_rms: {t_rms}')
-    if prompt_t_rms_min <= t_rms <= prompt_t_rms_max:
-        #print('Candidate passed the RMS cut')
-        filtered.append((t_in, n_hits, t_rms, charge_arr, mpmt_arr, pmt_arr, x_arr, y_arr, z_arr))
-    
-threshold_times_prompt = filtered
-print(f"Total promp candidates after RMS cut: {len(threshold_times_prompt)}")
-
-"""""""""""""""
-for event, candidates in threshold_times_prompt.items():
-    times_event = times_per_event[event]
-    filtered = []
-    for cand in candidates:
-        if isinstance(cand, dict):
-            t_in = cand["time"]
-            n_hits = cand["n_hits"]
-            charge_arr = cand["charge"]
-            mpmt_arr = cand["mpmt_id"]
-            pmt_arr = cand["pmt_id"]
-            x_arr = cand["vertex_x"]  
-            y_arr = cand["vertex_y"]
-            z_arr = cand["vertex_z"]
-        else:
-            # If you only ever have tuples, you can't include charge/mpmt here
-            t_in, n_hits = cand
-            charge_arr = None
-            mpmt_arr = None
-            pmt_arr = None
-
-        t_rms = functions_analysis.time_RMS_fun_time(times_event, t_in, prompt_window)
-
-        if prompt_t_rms_min <= t_rms <= prompt_t_rms_max:
-            filtered.append((t_in, n_hits, t_rms, charge_arr, mpmt_arr, pmt_arr, x_arr, y_arr, z_arr))
-
-    threshold_times_prompt[event] = filtered
-"""""""""""""""
-print("Prompt candidates found in run.")
-
-
-# Neutron detection ###########################################################################################################
-
-print("Searching for neutron events...")
-neutron_dict = functions_coincidence.neutron_detection_wBonsai(times_run, charge_run, mpmt_run, pmt_run, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
-
-print("Prompt candidates", len(threshold_times_prompt))
-print("Neutron candidates", len(neutron_dict))
-
-
-# Save neutron candidates to CSV files ###########################################################################################################
-
-print("Saving candidate neutron events on CSV...")
-
-df_neutron_candidates = pd.DataFrame(neutron_dict)
-#df_neutron_candidates = pd.DataFrame(neutron_candidates)
-#df_neutron_candidates = pd.concat(
-#    [pd.DataFrame(recs).assign(event_number=int(event)) for event, recs in neutron_dict.items()],
-#    ignore_index=True
-#)
-
-df_neutron_candidates.to_csv(f'{output_path}/AmBeCandidates/neutron_candidates_{run_number}_timestest.csv', index=False)
 
 # Running Accidental Search ###########################################################################################################
-neutron_df = pd.DataFrame(neutron_dict)
 neutron_df = neutron_df.sort_values('prompt_time').reset_index(drop=True)
 
 # compute differences between consecutive prompt_time values

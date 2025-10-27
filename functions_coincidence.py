@@ -220,6 +220,7 @@ def prompt_candidates_wBonsai(
     return valid_thresholds
 
 
+
 def neutron_detection(event_branch, times_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup = np.inf, window_prompt = 100):
 
     def neutron_detection_event(times_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup, window_prompt):
@@ -276,7 +277,7 @@ def neutron_detection_wBonsai(times_branch_event_arg, charge_branch_event_arg, m
         if mask.sum() == 0:
             continue
 
-        neutron_candidates,  neutron_nhits = nHitsTimeWindow(times_branch_event_arg[mask], threshold_inf, window_neutron, 0, threshold_sup=threshold_sup)
+        neutron_candidates,  neutron_nhits = nHitsTimeWindow(times_branch_event_arg[mask], threshold_inf, window_neutron, window_neutron, threshold_sup=threshold_sup)
         
         #for time_delayed in neutron_candidates:
         for i in range(len(neutron_candidates)):
@@ -312,3 +313,47 @@ def neutron_detection_wBonsai(times_branch_event_arg, charge_branch_event_arg, m
     
         #else:
             #print(f"Event {event} has no threshold times, skipping neutron detection.")
+def accidentals_wBonsai(times_branch_event_arg, charge_branch_event_arg, mpmt_branch_event_arg, pmt_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup = np.inf, window_prompt = 100):
+
+    valid_thresholds = []
+    #last_prompt = None
+
+    #for time_prompt in threshold_times:
+    for time_prompt in threshold_times:    
+        #if last_prompt is not None and (time_prompt-last_prompt) < (window_sliding + window_prompt):
+        #    continue
+
+        mask = (times_branch_event_arg >= time_prompt + window_prompt) & (times_branch_event_arg < time_prompt + window_prompt + window_sliding)
+        
+        if mask.sum() == 0:
+            continue
+
+        neutron_candidates,  neutron_nhits = nHitsTimeWindow(times_branch_event_arg[mask], threshold_inf, window_neutron, window_neutron, threshold_sup=threshold_sup)
+        
+        #for time_delayed in neutron_candidates:
+        for i in range(len(neutron_candidates)):
+            time_delayed = neutron_candidates[i]
+            delayed_nhits = neutron_nhits[i]
+            mask_delayed = (times_branch_event_arg >= time_delayed) & (times_branch_event_arg < time_delayed + window_sliding)
+            #neutron_nhits = mask_delayed.sum()
+
+            times_in_delayed = times_branch_event_arg[mask_delayed]
+            charges_in_delayed = charge_branch_event_arg[mask_delayed]
+            mpmt_in_delayed = mpmt_branch_event_arg[mask_delayed]
+            pmt_in_delayed = pmt_branch_event_arg[mask_delayed]
+            
+            vertex = functions_bonsai.run_BONSAI_candidate(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
+
+            valid_thresholds.append(
+                {
+                    'vp_prompt_time': float(time_prompt),
+                    "vp_delayed_time": float(time_delayed),
+                    "vp_delayed_nhits": delayed_nhits,
+                    "vp_delayed_x": vertex["x"][0],
+                    "vp_delayed_y": vertex["y"][0],
+                    "vp_delayed_z": vertex["z"][0],
+                }
+            )
+            if len(valid_thresholds) % 10 == 0:
+                print(f"Found Cand Events {len(valid_thresholds)}...")
+    return valid_thresholds
