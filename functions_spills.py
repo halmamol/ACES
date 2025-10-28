@@ -3,10 +3,13 @@ import awkward as ak
 import matplotlib.pyplot as plt
 
 import numpy as np
-import pandas as pd  
+import pandas as pd
 import json
+import sys
+import os
+sys.path.append(os.path.abspath("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk"))
 
-#import functions_bonsai
+# import ACES.functions_bonsai
 
 
 def spill_nHitsTT(times_branch_event_arg, threshold_inf, window, death_window, charge_branch_event = [], threshold_sup = np.inf):
@@ -341,7 +344,7 @@ def initial_treatment(tree):
     mpmt_slot_branch_clean = mpmt_slot_branch[valid_mask]
     pmt_position_clean = pmt_position[valid_mask]
 
-    mpmt_map = read_mpmt_offsets("/scratch/halmazan/WCTE/WCTECoincidence_Analysis/Complete_analysis/mpmt_tof_pos1.json")
+    mpmt_map = read_mpmt_offsets("/mnt/lustre/scratch/nlsas/home/usc/ie/dcr/hk/mpmt_tof_map/mpmt_tof_pos1525.json")
     corrections = correction_TOF(mpmt_map, mpmt_slot_branch_clean, pmt_position_clean)
     corrected_times = times_branch_clean - corrections
     
@@ -392,7 +395,7 @@ def counting_nHits_window(event_number_branch, times_branch, bin_window):
         i=0
 
         while i<n:
-            
+
             t_in = times_branch_event[i]
             mask = (times_branch_event >= t_in) & (times_branch_event < t_in + bin_window)
             count = mask.sum()
@@ -400,7 +403,6 @@ def counting_nHits_window(event_number_branch, times_branch, bin_window):
             i = np.searchsorted(times_branch_event, t_in + bin_window, side='left')
 
     return nHits
-
 
 def multiple_partition(root_files):
 
