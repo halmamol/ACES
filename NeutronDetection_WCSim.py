@@ -43,8 +43,10 @@ parser.add_argument(
 )
 
 # Arguments for Analysis 
-run_number = "2384"  # Run number
-output_path = "/scratch/halmazan/WCTE/files/data/"
+run_number = "0"  # Run number
+output_path = "/scratch/halmazan/WCTE/files/wcsim/"
+
+file = "ambe_10kevts_003GD_0DR_noTrigger.npz"
 
 # Parameters for Candidate Detection
 prompt_window = 1500  # Window for prompt candidates
@@ -55,16 +57,16 @@ prompt_nhits_min = 150 # Minimum number of hits for prompt candidates
 prompt_nhits_max = 300 # Maximum number of hits for prompt candidates
 coincidence_window = 150000  # Window for coincidence search
 delayed_window = 100  # Window for delayed candidates
-delayed_nhits_min = 5  # Minimum number of hits for delayed candidates
-delayed_nhits_max = 100  # Maximum number of hits for delayed candidates
+delayed_nhits_min = 10  # Minimum number of hits for delayed candidates
+delayed_nhits_max = 30  # Maximum number of hits for delayed candidates
 ### Accidentals
 nBG = 10 # Number of accidental windows to search
 deltat_vp = 1000000 #ms Time difference for accidental search
 
-print("Opening: ", f'{output_path}filtered_files/filtered_file_{run_number}.pkl')
-print("Output saved in: ", f'{output_path}AmBeCandidates/neutron_candidates_{run_number}.csv')
+print("Opening: ", f'{output_path}/{file}')
+print("Output saved in: ", f'{output_path}AmBeCandidates/wcsim.csv')
 
-with open(f'{output_path}filtered_files/filtered_file_daqtime_{run_number}.pkl', 'rb') as f:
+with open(f'{output_path}/{file}', 'rb') as f:
 #    data = pickle.load(f)
     data = Numpy2to1Unpickler(f).load()
 
@@ -209,9 +211,8 @@ df_neutron_candidates = pd.DataFrame(neutron_dict)
 #    ignore_index=True
 #)
 
-df_neutron_candidates.to_csv(f'{output_path}/AmBeCandidates/neutron_candidates_{run_number}_timestest_newlimits.csv', index=False)
+df_neutron_candidates.to_csv(f'{output_path}/AmBeCandidates/neutron_candidates_{run_number}_timestest.csv', index=False)
 
-"""""""""""""""
 # Running Accidental Search ###########################################################################################################
 neutron_df = pd.DataFrame(neutron_dict)
 neutron_df = neutron_df.sort_values('prompt_time').reset_index(drop=True)
@@ -248,9 +249,8 @@ df_vp_neutron_candidates = pd.DataFrame(vp_neutron_dict)
 #    ignore_index=True
 #)
 
-df_vp_neutron_candidates.to_csv(f'{output_path}/AmBeCandidates/accidental_candidates_{run_number}_timestest_newlimits.csv', index=False)
+df_vp_neutron_candidates.to_csv(f'{output_path}/AmBeCandidates/accidental_candidates_{run_number}_timestest.csv', index=False)
 
 
-"""""""""""""""
 print("CSV files saved.")
 print("End of code.")
