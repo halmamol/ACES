@@ -43,9 +43,10 @@ parser.add_argument(
 )
 
 # Arguments for Analysis 
-run_number = "2387"  # Run number
+run_number = "2388"  # Run number
 output_path = "/scratch/halmazan/WCTE/files/data/"
 
+# Parameters for Candidate Detection
 prompt_window = 1500  # Window for prompt candidates
 prompt_dead_time = 200  # Death time for prompt candidates
 prompt_t_rms_min = 200 # Minimum RMS time for prompt candidates
@@ -56,13 +57,17 @@ coincidence_window = 150000  # Window for coincidence search
 delayed_window = 100  # Window for delayed candidates
 delayed_nhits_min = 10  # Minimum number of hits for delayed candidates
 delayed_nhits_max = 30  # Maximum number of hits for delayed candidates
+### Accidentals
+nBG = 5 # Number of accidental windows to search
+deltat_vp = 50000 #ms Time difference for accidental search
 
-print("Opening: ", f'{output_path}filtered_files/filtered_file_{run_number}.pkl')
-print("Output saved in: ", f'{output_path}AmBeCandidates/neutron_candidates_{run_number}.csv')
+print("Opening Files...")
 
 with open(f'{output_path}filtered_files/filtered_file_{run_number}.pkl', 'rb') as f:
 #    data = pickle.load(f)
     data = Numpy2to1Unpickler(f).load()
+
+neutron_df = pd.read_csv(f'{output_path}AmBeCandidates/neutron_candidates_{run_number}.csv')
 
 times_vals = data["times_TOF"]["values"]
 times_offs = data["times_TOF"]["offsets"]
@@ -83,66 +88,66 @@ N_events = len(times_per_event)
 
 
 print(f"Number of events in run {run_number}", N_events)
+print(f"Total suppousdely lenght of run ", {N_events*270000})
+
+
+# Concatenate all per-event arrays
+all_charges = np.concatenate(charge_per_event)
+all_mpmts = np.concatenate(mpmt_per_event)
+all_pmt = np.concatenate(pmt_per_event)
+
+# To add offsets to each time, build an array of per-hit offsets
+# For each event, repeat the offset for the number of hits in that event
+event_offsets = np.concatenate([
+    np.full(len(ev), offset) for ev, offset in zip(times_per_event, times_offs)
+])
 
 
 event_number_branch = np.arange(0, N_events, 1)
 
-# Prompt candidates detection ###########################################################################################################
 
-print("Searching prompt candidate events...")
-threshold_times_prompt = functions_coincidence.prompt_candidates_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, prompt_window, prompt_dead_time, prompt_nhits_min, prompt_nhits_max)
+# Running Accidental Search ###########################################################################################################
+neutron_df = neutron_df.sort_values('prompt_time').reset_index(drop=True)
 
+# compute differences between consecutive prompt_time values
+#neutron_df['dt'] = neutron_df['prompt_time'].diff()
 
-for event, candidates in threshold_times_prompt.items():
-    times_event = times_per_event[event]
-    filtered = []
-    for cand in candidates:
-        if isinstance(cand, dict):
-            t_in = cand["time"]
-            n_hits = cand["n_hits"]
-            charge_arr = cand["charge"]
-            mpmt_arr = cand["mpmt_id"]
-            pmt_arr = cand["pmt_id"]
-            x_arr = cand["vertex_x"]  
-            y_arr = cand["vertex_y"]
-            z_arr = cand["vertex_z"]
-        else:
-            # If you only ever have tuples, you can't include charge/mpmt here
-            t_in, n_hits = cand
-            charge_arr = None
-            mpmt_arr = None
-            pmt_arr = None
-
-        t_rms = functions_analysis.time_RMS_fun_time(times_event, t_in, prompt_window)
-
-        if prompt_t_rms_min <= t_rms <= prompt_t_rms_max:
-            filtered.append((t_in, n_hits, t_rms, charge_arr, mpmt_arr, pmt_arr, x_arr, y_arr, z_arr))
-
-    threshold_times_prompt[event] = filtered
-print("Prompt candidates found in run.")
+neutron_df['dt'] = 270000 - neutron_df['prompt_time']
 
 
-# Neutron detection ###########################################################################################################
+mask = neutron_df['dt'] < (deltat_vp * nBG)  
 
-print("Searching for neutron events...")
-neutron_dict = functions_coincidence.neutron_detection_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
+vp_times_by_event = {}
+for event, group in neutron_df.loc[mask].groupby('event_number'):
+    t0 = group['prompt_time'].iloc[0]   # or use .min() if preferred
+    vp_times_by_event[event] = [t0 + j * deltat_vp for j in range(nBG)]
 
-print("Prompt candidates", sum(len(v) for v in threshold_times_prompt.values()))
-print("Neutron candidates", sum(len(v) for v in neutron_dict.values()))
+print(f"Total vp windows found: {len(vp_times_by_event)}")
+print("Running accidental search...")
+vp_neutron_dict = functions_coincidence.accidentals_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, vp_times_by_event, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
 
+print("VP Neutron candidates", len(vp_neutron_dict))
 
-# Save neutron candidates to CSV files ###########################################################################################################
+# Save accidental candidates to CSV files ###########################################################################################################
 
-print("Saving candidate neutron events on CSV...")
+print("Saving accidental events on CSV...")
 
-#df_neutron_candidates = pd.DataFrame(neutron_dict)
-#df_neutron_candidates = pd.DataFrame(neutron_candidates)
-df_neutron_candidates = pd.concat(
-    [pd.DataFrame(recs).assign(event_number=int(event)) for event, recs in neutron_dict.items()],
+#df_vp_neutron_candidates = pd.DataFrame({
+#    'event': list(vp_neutron_dict.keys()),
+#    'results': list(vp_neutron_dict.values())
+#})
+df_vp_neutron_candidates = pd.concat(
+    [pd.DataFrame(recs).assign(event_number=int(event)) for event, recs in vp_neutron_dict.items()],
     ignore_index=True
 )
+#df_vp_neutron_candidates = pd.DataFrame(vp_neutron_dict)
+#df_neutron_candidates = pd.DataFrame(neutron_candidates)
+#df_neutron_candidates = pd.concat(
+#    [pd.DataFrame(recs).assign(event_number=int(event)) for event, recs in neutron_dict.items()],
+#    ignore_index=True
+#)
 
-df_neutron_candidates.to_csv(f'{output_path}/AmBeCandidates/neutron_candidates_{run_number}_test.csv', index=False)
+df_vp_neutron_candidates.to_csv(f'{output_path}/AmBeCandidates/accidental_candidates_{run_number}.csv', index=False)
 
 
 print("CSV files saved.")

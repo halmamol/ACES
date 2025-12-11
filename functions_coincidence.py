@@ -353,3 +353,86 @@ def neutron_detection_wBonsai(event_branch, times_branch_arg, charge_branch_arg,
     return dict_neutrons
         #else:
             #print(f"Event {event} has no threshold times, skipping neutron detection.")
+
+
+def accidentals_wBonsai(event_branch, times_branch_event_arg, charge_branch_event_arg, mpmt_branch_event_arg, pmt_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup = np.inf, window_prompt = 100):
+
+    def accidentals_wBonsai_evt(event_number, times_branch_event_arg, charge_branch_event_arg, mpmt_branch_event_arg, pmt_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup = np.inf, window_prompt = 10):
+        valid_thresholds = []
+        #last_prompt = None
+
+        #for time_prompt in threshold_times:
+        for time_prompt in threshold_times:    
+            #if last_prompt is not None and (time_prompt-last_prompt) < (window_sliding + window_prompt):
+            #    continue
+
+            mask = (times_branch_event_arg >= time_prompt + window_prompt) & (times_branch_event_arg < time_prompt + window_prompt + window_sliding)
+            
+            if mask.sum() == 0:
+                continue
+
+            neutron_candidates,  neutron_nhits = nHitsTimeWindow(times_branch_event_arg[mask], threshold_inf, window_neutron, window_neutron, threshold_sup=threshold_sup)
+            
+            #for time_delayed in neutron_candidates:
+            for i in range(len(neutron_candidates)):
+                time_delayed = neutron_candidates[i]
+                delayed_nhits = neutron_nhits[i]
+                mask_delayed = (times_branch_event_arg >= time_delayed) & (times_branch_event_arg < time_delayed + window_sliding)
+                #neutron_nhits = mask_delayed.sum()
+
+                times_in_delayed = times_branch_event_arg[mask_delayed]
+                charges_in_delayed = charge_branch_event_arg[mask_delayed]
+                mpmt_in_delayed = mpmt_branch_event_arg[mask_delayed]
+                pmt_in_delayed = pmt_branch_event_arg[mask_delayed]
+                
+                vertex = functions_bonsai.run_BONSAI_candidate(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
+
+                valid_thresholds.append(
+                    {
+                        'event_number': event_number,
+                        'vp_prompt_time': float(time_prompt),
+                        "vp_delayed_time": float(time_delayed),
+                        "vp_delayed_nhits": delayed_nhits,
+                        "vp_delayed_x": vertex["x"][0],
+                        "vp_delayed_y": vertex["y"][0],
+                        "vp_delayed_z": vertex["z"][0],
+                    }
+                )
+                if len(valid_thresholds) % 10 == 0:
+                    print(f"Found Cand Events {len(valid_thresholds)}...")
+        return valid_thresholds
+
+    #dict_neutrons = {}
+    #for event in event_branch:
+    #    if event % 1000 == 0:
+    #        print(f"Searching accidental coincidences on event {event}...")
+    #    if event in threshold_times:
+    #        if len(threshold_times[event]) == 0:
+    #            continue 
+    #        results = accidentals_wBonsai_evt(event, times_branch_event_arg[event], charge_branch_event_arg[event], mpmt_branch_event_arg[event], pmt_branch_event_arg[event], threshold_times[event], window_sliding, window_neutron, threshold_inf, threshold_sup, window_prompt)
+    #        if len(results) != 0:
+    #            dict_neutrons[event] = results
+
+    dict_neutrons = {}
+
+    for event, times in threshold_times.items():
+        if event % 1000 == 0:
+            print(f"Searching accidental coincidences on event {event}...")
+        results = accidentals_wBonsai_evt(
+            event,
+            times_branch_event_arg[event],
+            charge_branch_event_arg[event],
+            mpmt_branch_event_arg[event],
+            pmt_branch_event_arg[event],
+            times,
+            window_sliding,
+            window_neutron,
+            threshold_inf,
+            threshold_sup,
+            window_prompt
+        )
+        if results:
+            dict_neutrons[event] = results
+            
+    return dict_neutrons
+

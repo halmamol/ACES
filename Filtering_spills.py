@@ -25,7 +25,7 @@ args = parser.parse_args()
 partition = args.partition
 
 # Other arguments for the analysis
-run_number = "2389"  # Run number
+run_number = "2388"  # Run number
 nhits_threshold = 300  # Threshold for nHits
 nhits_window = 5000  # Window for nHits
 death_time = 6000  # Death time for nHits
