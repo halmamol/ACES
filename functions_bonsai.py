@@ -120,5 +120,109 @@ def run_BONSAI_candidate(times, charges, mpmt, pmt, g=geo):
     
     
     return vertex
+
+#------------------------------------------
+from scipy.integrate import quad
+from scipy.optimize import minimize
+
+# Constants
+speed_of_light = 299792458  # m/s
+
+# Function to calculate time-of-flight (t_TOF)
+def time_of_flight(r_s, r_PMT):
+    """
+    Calculate time-of-flight for light traveling from source vertex to PMT.
+    :param r_s: Source vertex [x, y, z] (numpy array)
+    :param r_PMT: PMT position [x, y, z] (numpy array)
+    :return: Time-of-flight in seconds
+    """
+    distance = np.linalg.norm(r_s - r_PMT)
+    return distance / speed_of_light
+
+# Likelihood function for a single PMT hit
+def likelihood(t_hit, r_s, T0, r_PMT, lambda_decay):
+    """
+    Compute likelihood for a single hit given PMT time, position, and source vertex.
+    :param t_hit: Time of the hit (float, in seconds)
+    :param r_s: Source vertex [x, y, z] (numpy array)
+    :param T0: First scintillation photon time (float, in seconds)
+    :param r_PMT: PMT position [x, y, z] (numpy array)
+    :param lambda_decay: Decay constant (float)
+    :return: Likelihood value (float)
+    """
+    # Compute time-of-flight
+    t_TOF = time_of_flight(r_s, r_PMT)
+    
+    # Integrand for unknown emission time
+    def integrand(t_emission):
+        return lambda_decay * np.exp(-lambda_decay * (t_hit - T0 - t_TOF - t_emission))
+    
+    # Perform numerical integration over emission times
+    likelihood_value, _ = quad(integrand, 0, np.inf)
+    return likelihood_value
+
+# Objective function for optimization
+def total_likelihood(params, times_in_delayed, charges_in_delayed, x, y, z):
+    """
+    Total likelihood (negative log-likelihood for optimization).
+    :param params: Array of [x, y, z, T0, lambda_decay]
+    :param times_in_delayed: Hit times [t_hit^(i)] (1D numpy array)
+    :param charges_in_delayed: Hit charges [q_hit^(i)] (1D numpy array)
+    :param x: X coordinates of PMT positions (1D numpy array)
+    :param y: Y coordinates of PMT positions (1D numpy array)
+    :param z: Z coordinates of PMT positions (1D numpy array)
+    :return: Negative log-likelihood (float)
+    """
+    # Extract parameters
+    r_s = np.array([params[0], params[1], params[2]])  # Source vertex [x, y, z]
+    T0 = params[3]  # First photon time
+    lambda_decay = params[4]  # Decay constant
+    
+    # Compute total likelihood
+    total_log_likelihood = 0
+    for i, t_hit in enumerate(times_in_delayed):
+        r_PMT = np.array([x[i], y[i], z[i]])  # PMT position
+        likelihood_value = likelihood(t_hit, r_s, T0, r_PMT, lambda_decay)
+        weighted_likelihood = likelihood_value * charges_in_delayed[i]  # Weight by charge
+        total_log_likelihood -= np.log(weighted_likelihood)  # Negative log-likelihood
+    
+    return total_log_likelihood
+
+# Optimization function
+def optimize_parameters(times_in_delayed, charges_in_delayed, x, y, z, initial_guess):
+    """
+    Optimize parameters (r_s, T0, lambda_decay) to maximize likelihood.
+    :param times_in_delayed: Hit times [t_hit^(i)] (1D numpy array)
+    :param charges_in_delayed: Hit charges [q_hit^(i)] (1D numpy array)
+    :param x: X coordinates of PMT positions (1D numpy array)
+    :param y: Y coordinates of PMT positions (1D numpy array)
+    :param z: Z coordinates of PMT positions (1D numpy array)
+    :param initial_guess: Initial guess for parameters [x, y, z, T0, lambda_decay]
+    :return: Optimized parameters (numpy array)
+    """
+    result = minimize(
+        total_likelihood,
+        initial_guess,
+        args=(times_in_delayed, charges_in_delayed, x, y, z),
+        method='L-BFGS-B',  # Bound optimization
+        bounds=[(-10, 10), (-10, 10), (-10, 10), (0, 1), (1e-4, 10)]  # Example bounds for params
+    )
+    return result.x  # Return optimized parameters
+
+def scintillation_candidates(times, charges, mpmt, pmt, g=geo):
+
+    x_pmt, y_pmt , z_pmt, cables = getxyz(g, mpmt, pmt)
+
+    initial_guess = [0, 0, 0, 0.001, 0.1]  # Initial guess for [x, y, z, T0, lambda_decay]
+
+    # Perform optimization
+    optimized_parameters = optimize_parameters(times, charges, x_pmt, y_pmt, z_pmt, initial_guess)
+
+    print("Optimized Parameters:", optimized_parameters)
+    print("Optimized Source Vertex (r_s):", optimized_parameters[:3])
+    print("Optimized T0:", optimized_parameters[3])
+    print("Optimized Lambda Decay:", optimized_parameters[4])
+    
+    return optimized_parameters
             
 

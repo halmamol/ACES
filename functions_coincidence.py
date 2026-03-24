@@ -227,6 +227,149 @@ def prompt_candidates_wBonsai(
 
     return threshold_times
 
+def prompt_candidates_wScintillationLikelihood(
+    event_branch,
+    times_branch_arg,
+    charge_branch_arg,
+    mpmt_branch_arg,
+    pmt_branch_arg,
+    window_sliding,
+    window_clean,
+    threshold_inf,
+    threshold_sup,
+):
+    """
+    For each event, find "prompt" candidates using nHitsTimeWindow, enforce clean
+    windows before/after, and return (per event) a list of prompt entries that
+    include the trigger time, number of hits in the prompt window, and the charge
+    and mPMT-id arrays for the hits inside that window.
+
+    Returns:
+        dict:
+            {
+              event_id: [
+                {
+                  "time": float,            # trigger time (prompt)
+                  "n_hits": int,            # number of hits in [time, time+window_sliding)
+                  "charge": np.ndarray,     # charges of hits in the prompt window
+                  "mpmt_id": np.ndarray,    # mPMT ids of hits in the prompt window
+                  # Optional: you may also add "indices" or "times" if needed
+                },
+                ...
+              ],
+              ...
+            }
+    """
+    import numpy as np
+
+    def prompt_candidates_event(
+        times_event: np.ndarray,
+        charge_event: np.ndarray,
+        mpmt_event: np.ndarray,
+        pmt_event: np.ndarray,
+        window_sliding: float,
+        window_clean: float,
+        threshold_inf: float,
+        threshold_sup: float,
+    ):
+        # Sanity: arrays must be aligned
+        if not (len(times_event) == len(charge_event) == len(mpmt_event) == len(pmt_event)):
+            raise ValueError(
+                f"Arrays have mismatched lengths (times={len(times_event)}, "
+                f"charge={len(charge_event)}, mpmt={len(mpmt_event)}, pmt={len(pmt_event)})"
+            )
+
+        valid_thresholds = []
+
+        # Find candidate trigger times
+        threshold_list,  _ = nHitsTimeWindow(
+            times_event,
+            threshold_inf,
+            window_sliding,
+            0,
+            threshold_sup=threshold_sup,
+        )
+
+        for time_prompt in threshold_list:
+            # Clean windows before and after the candidate
+            mask_clean_1 = (times_event >= time_prompt - window_clean) & (times_event < time_prompt)
+            mask_clean_2 = (times_event > time_prompt + window_sliding) & (
+                times_event < time_prompt + window_sliding + window_clean
+            )
+
+            if mask_clean_1.sum() != 0:
+                clean_list_1, _ = nHitsTimeWindow(
+                    times_event[mask_clean_1], threshold_inf, window_sliding, 0, threshold_sup=threshold_sup
+                )
+            else:
+                clean_list_1 = []
+
+            if mask_clean_2.sum() != 0:
+                clean_list_2, _ = nHitsTimeWindow(
+                    times_event[mask_clean_2], threshold_inf, window_sliding, 0, threshold_sup=threshold_sup
+                )
+            else:
+                clean_list_2 = []
+
+            # Accept only if no other signal candidate too close
+            if len(clean_list_1) + len(clean_list_2) == 0:
+                mask_hits = (times_event >= time_prompt) & (times_event < time_prompt + window_sliding)
+                n_hits_here = int(mask_hits.sum())
+                if n_hits_here == 0:
+                    continue
+                
+                times_in_prompt = times_event[mask_hits]
+                charges_in_prompt = charge_event[mask_hits]
+                mpmt_in_prompt = mpmt_event[mask_hits]
+                pmt_in_prompt = pmt_event[mask_hits]
+
+                vertex = functions_bonsai.scintillation_candidates(times_in_prompt, charges_in_prompt, mpmt_in_prompt, pmt_in_prompt)
+
+                valid_thresholds.append(
+                    {
+                        "time": float(time_prompt),
+                        "n_hits": n_hits_here,
+                        "charge": charges_in_prompt,
+                        "mpmt_id": mpmt_in_prompt,
+                        "pmt_id": pmt_in_prompt,
+                        "vertex_x": vertex[0],
+                        "vertex_y": vertex[1],
+                        "vertex_z": vertex[2],
+                        # If useful, you can also include:
+                        # "indices": np.where(mask_hits)[0],
+                        # "times": times_event[mask_hits],
+                    }
+                )
+
+        return valid_thresholds
+
+    threshold_times = {}
+
+    for event in event_branch:
+        if event % 1000 == 0:
+            print(f"Searching prompt candidates on event {event}...")
+
+        times_event = times_branch_arg[event]
+        charge_event = charge_branch_arg[event]
+        mpmt_event = mpmt_branch_arg[event]
+        pmt_event = pmt_branch_arg[event]
+
+        results = prompt_candidates_event(
+            times_event,
+            charge_event,
+            mpmt_event,
+            pmt_event,
+            window_sliding,
+            window_clean,
+            threshold_inf,
+            threshold_sup,
+        )
+
+        if len(results) != 0:
+            threshold_times[event] = results
+
+    return threshold_times
+
 def neutron_detection(event_branch, times_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup = np.inf, window_prompt = 100):
 
     def neutron_detection_event(times_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup, window_prompt):
@@ -269,55 +412,130 @@ def neutron_detection(event_branch, times_branch_event_arg, threshold_times, win
     return dict_neutrons
 
 def neutron_detection_wBonsai(event_branch, times_branch_arg, charge_branch_arg, mpmt_branch_arg, pmt_branch_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup = np.inf, window_prompt = 100):
-
+    #print('inside loop')
     def neutron_detection_event(event_number, times_branch_event_arg, charge_branch_event_arg, mpmt_branch_event_arg, pmt_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup, window_prompt):
-        
+        #print('checking event', event_number)
         dict_neutrons_event = {}
         valid_thresholds = []
         last_prompt = None
-
+        prompt_lockout_until = None
+        print(f'Event {event_number} has {len(threshold_times)} prompt candidates')
         #for time_prompt in threshold_times:
-        for time_prompt, nhits_prompt, trms_prompt,_ , _, _, x_prompt, y_prompt, z_prompt  in threshold_times:    
+        for time_prompt, nhits_prompt, trms_prompt, times_prompt, _ , mpmt_prompt, pmt_prompt, x_prompt, y_prompt, z_prompt  in threshold_times:
+            print(f'Prompt time {time_prompt}')    
             if last_prompt is not None and (time_prompt-last_prompt) < (window_sliding + window_prompt):
                 continue
 
+            if prompt_lockout_until is not None and time_prompt < prompt_lockout_until:
+                continue
+
             mask = (times_branch_event_arg >= time_prompt + window_prompt) & (times_branch_event_arg < time_prompt + window_prompt + window_sliding)
-            
+            #print('After isolating prompt')
             if mask.sum() == 0:
                 continue
 
             neutron_candidates,  neutron_nhits = nHitsTimeWindow(times_branch_event_arg[mask], threshold_inf, window_neutron, 0, threshold_sup=threshold_sup)
-            
+            #print('Delayed found, checking now masks')
             #for time_delayed in neutron_candidates:
-            for i in range(len(neutron_candidates)):
-                time_delayed = neutron_candidates[i]
-                delayed_nhits = neutron_nhits[i]
-                mask_delayed = (times_branch_event_arg >= time_delayed) & (times_branch_event_arg < time_delayed + window_sliding)
-                #neutron_nhits = mask_delayed.sum()
 
-                times_in_delayed = times_branch_event_arg[mask_delayed]
-                charges_in_delayed = charge_branch_event_arg[mask_delayed]
-                mpmt_in_delayed = mpmt_branch_event_arg[mask_delayed]
-                pmt_in_delayed = pmt_branch_event_arg[mask_delayed]
-                
-                vertex = functions_bonsai.run_BONSAI_candidate(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
+            ##########################################
 
-                valid_thresholds.append(
-                    {
-                        'event_number': event_number,
-                        'prompt_nhits': nhits_prompt,
-                        'prompt_time': float(time_prompt),
-                        'prompt_trms': trms_prompt,
-                        'prompt_x': x_prompt,
-                        'prompt_y': y_prompt,
-                        'prompt_z': z_prompt,
-                        "delayed_time": float(time_delayed),
-                        "delayed_nhits": delayed_nhits,
-                        "delayed_x": vertex["x"][0],
-                        "delayed_y": vertex["y"][0],
-                        "delayed_z": vertex["z"][0],
-                    }
-                )
+            if neutron_candidates is None or neutron_nhits is None:
+                continue
+            if len(neutron_candidates) == 0 or len(neutron_nhits) == 0:
+                continue
+
+            # If they can ever be mismatched, either skip or truncate safely
+            if len(neutron_candidates) != len(neutron_nhits):
+                # safest behavior: skip this prompt (or you can handle it differently)
+                print("Warning: mismatch candidates/nhits", len(neutron_candidates), len(neutron_nhits))
+                continue
+
+            # Highest nHits candidate
+            i_best = int(np.argmax(neutron_nhits))
+            time_delayed = neutron_candidates[i_best]
+            delayed_nhits = neutron_nhits[i_best]
+
+            # Earliest candidate
+            #i_first = int(np.argmin(neutron_candidates))  # earliest time
+            #time_delayed = neutron_candidates[i_first]
+            #delayed_nhits = neutron_nhits[i_first]
+
+            mask_delayed = (times_branch_event_arg >= time_delayed) & (times_branch_event_arg < time_delayed + window_sliding)
+
+            times_in_delayed = times_branch_event_arg[mask_delayed]
+            charges_in_delayed = charge_branch_event_arg[mask_delayed]
+            mpmt_in_delayed = mpmt_branch_event_arg[mask_delayed]
+            pmt_in_delayed = pmt_branch_event_arg[mask_delayed]
+            #print('Running bonsai')
+            if (event_number == 6621):
+                #print(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
+                continue
+            vertex = functions_bonsai.run_BONSAI_candidate(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
+            #print('vertex okay, saving info')
+            valid_thresholds.append(
+                {
+                    'event_number': event_number,
+                    'prompt_nhits': nhits_prompt,
+                    'prompt_time': float(time_prompt),
+                    'prompt_trms': trms_prompt,
+                    'prompt_times': times_prompt,
+                    'prompt_x': x_prompt,
+                    'prompt_y': y_prompt,
+                    'prompt_z': z_prompt,
+                    'prompt_mpmt': mpmt_prompt,
+                    'prompt_pmt': pmt_prompt,
+                    "delayed_time": float(time_delayed),
+                    "delayed_nhits": delayed_nhits,
+                    "delayed_x": vertex["x"][0],
+                    "delayed_y": vertex["y"][0],
+                    "delayed_z": vertex["z"][0],
+                }
+            )
+            print("  picked delayed", time_delayed, "-> lockout", time_delayed + window_neutron)
+
+            prompt_lockout_until = time_delayed + window_neutron
+            #last_prompt = time_prompt
+                #####################################
+            ##########################################
+            #for i in range(len(neutron_candidates)):
+            #    time_delayed = neutron_candidates[i]
+            #    delayed_nhits = neutron_nhits[i]
+            #    #print('Saving masks delayed')
+            #    mask_delayed = (times_branch_event_arg >= time_delayed) & (times_branch_event_arg < time_delayed + window_sliding)
+            #    #print('Saved masks delayed')
+            #    #neutron_nhits = mask_delayed.sum()
+
+            #    times_in_delayed = times_branch_event_arg[mask_delayed]
+            #    charges_in_delayed = charge_branch_event_arg[mask_delayed]
+            #    mpmt_in_delayed = mpmt_branch_event_arg[mask_delayed]
+            #    pmt_in_delayed = pmt_branch_event_arg[mask_delayed]
+            #    #print('Running bonsai')
+            #    if (event_number == 6621):
+            #        #print(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
+            #        continue
+            #    vertex = functions_bonsai.run_BONSAI_candidate(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
+            #    #print('vertex okay, saving info')
+            #    valid_thresholds.append(
+            #        {
+            #            'event_number': event_number,
+            #            'prompt_nhits': nhits_prompt,
+            #            'prompt_time': float(time_prompt),
+            #            'prompt_trms': trms_prompt,
+            #            'prompt_times': times_prompt,
+            #            'prompt_x': x_prompt,
+            #            'prompt_y': y_prompt,
+            #            'prompt_z': z_prompt,
+            #            'prompt_mpmt': mpmt_prompt,
+            #            'prompt_pmt': pmt_prompt,
+            #            "delayed_time": float(time_delayed),
+            #            "delayed_nhits": delayed_nhits,
+            #            "delayed_x": vertex["x"][0],
+            #            "delayed_y": vertex["y"][0],
+            #            "delayed_z": vertex["z"][0],
+            #        }
+            #    )
+            #    #####################################
 
                 #
                 #'prompt_time': float(start_time),
@@ -335,12 +553,14 @@ def neutron_detection_wBonsai(event_branch, times_branch_arg, charge_branch_arg,
             #if len(neutron_candidates) != 0:
             #    # Store as list of tuples (neutron_time, neutron_nhits)
             #    dict_neutrons_event[time_prompt] = list(zip(neutron_candidates, neutron_nhits, vertex["x"][0], vertex["y"][0],vertex["z"][0]))#[(nt, neutron_nhits) for nt in neutron_candidates]
-            #    last_prompt = time_prompt
+            
 
         return valid_thresholds
     
     dict_neutrons = {}
     for event in event_branch:
+        if event == 6621:
+            continue
         if event % 1000 == 0:
             print(f"Searching neutron coincidences on event {event}...")
         if event in threshold_times:
@@ -360,20 +580,28 @@ def accidentals_wBonsai(event_branch, times_branch_event_arg, charge_branch_even
     def accidentals_wBonsai_evt(event_number, times_branch_event_arg, charge_branch_event_arg, mpmt_branch_event_arg, pmt_branch_event_arg, threshold_times, window_sliding, window_neutron, threshold_inf, threshold_sup = np.inf, window_prompt = 10):
         valid_thresholds = []
         #last_prompt = None
+        
 
-        #for time_prompt in threshold_times:
-        for time_prompt in threshold_times:    
-            #if last_prompt is not None and (time_prompt-last_prompt) < (window_sliding + window_prompt):
-            #    continue
-
+        # Windows Method (1)###################################################################
+        for time_prompt in threshold_times:
             mask = (times_branch_event_arg >= time_prompt + window_prompt) & (times_branch_event_arg < time_prompt + window_prompt + window_sliding)
-            
             if mask.sum() == 0:
                 continue
-
             neutron_candidates,  neutron_nhits = nHitsTimeWindow(times_branch_event_arg[mask], threshold_inf, window_neutron, window_neutron, threshold_sup=threshold_sup)
+        #########################################################################################            
+
+        # No Windows Method (2)########################################################################################
+        #time_prompt = threshold_times
+        #
+        #mask = (times_branch_event_arg >= time_prompt + window_prompt) & (times_branch_event_arg < time_prompt + window_prompt + window_sliding)
+        #
+        #if mask.sum() != 0:
+        #    neutron_candidates,  neutron_nhits = nHitsTimeWindow(times_branch_event_arg[mask], threshold_inf, window_neutron, window_neutron, threshold_sup=threshold_sup)
+    
+        #########################################################################################
             
-            #for time_delayed in neutron_candidates:
+
+            #for time_delayed in neutron_candidates:     
             for i in range(len(neutron_candidates)):
                 time_delayed = neutron_candidates[i]
                 delayed_nhits = neutron_nhits[i]
@@ -400,6 +628,46 @@ def accidentals_wBonsai(event_branch, times_branch_event_arg, charge_branch_even
                 )
                 if len(valid_thresholds) % 10 == 0:
                     print(f"Found Cand Events {len(valid_thresholds)}...")
+        #for time_prompt in threshold_times:
+
+        #for time_prompt in threshold_times:    
+        #    #if last_prompt is not None and (time_prompt-last_prompt) < (window_sliding + window_prompt):
+        #    #    continue
+        #
+        #    mask = (times_branch_event_arg >= time_prompt + window_prompt) & (times_branch_event_arg < time_prompt + window_prompt + window_sliding)
+        #    
+        #    if mask.sum() == 0:
+        #        continue
+        #
+        #    neutron_candidates,  neutron_nhits = nHitsTimeWindow(times_branch_event_arg[mask], threshold_inf, window_neutron, window_neutron, threshold_sup=threshold_sup)
+        #    
+        #    #for time_delayed in neutron_candidates:
+        #    for i in range(len(neutron_candidates)):
+        #        time_delayed = neutron_candidates[i]
+        #        delayed_nhits = neutron_nhits[i]
+        #        mask_delayed = (times_branch_event_arg >= time_delayed) & (times_branch_event_arg < time_delayed + window_sliding)
+        #        #neutron_nhits = mask_delayed.sum()
+        #
+        #        times_in_delayed = times_branch_event_arg[mask_delayed]
+        #        charges_in_delayed = charge_branch_event_arg[mask_delayed]
+        #        mpmt_in_delayed = mpmt_branch_event_arg[mask_delayed]
+        #        pmt_in_delayed = pmt_branch_event_arg[mask_delayed]
+        #        
+        #        vertex = functions_bonsai.run_BONSAI_candidate(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
+        #
+        #        valid_thresholds.append(
+        #            {
+        #                'event_number': event_number,
+        #                'vp_prompt_time': float(time_prompt),
+        #                "vp_delayed_time": float(time_delayed),
+        #                "vp_delayed_nhits": delayed_nhits,
+        #                "vp_delayed_x": vertex["x"][0],
+        #                "vp_delayed_y": vertex["y"][0],
+        #                "vp_delayed_z": vertex["z"][0],
+        #            }
+        #        )
+        #        if len(valid_thresholds) % 10 == 0:
+        #            print(f"Found Cand Events {len(valid_thresholds)}...")
         return valid_thresholds
 
     #dict_neutrons = {}

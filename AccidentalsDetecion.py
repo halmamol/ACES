@@ -11,6 +11,7 @@ import glob
 import os
 import argparse
 import pickle
+import random
 
 class Numpy2to1Unpickler(pickle.Unpickler):
     MAP = {
@@ -43,7 +44,7 @@ parser.add_argument(
 )
 
 # Arguments for Analysis 
-run_number = "2388"  # Run number
+run_number = "2385"  # Run number
 output_path = "/scratch/halmazan/WCTE/files/data/"
 
 # Parameters for Candidate Detection
@@ -54,11 +55,11 @@ prompt_t_rms_max = 400 # Maximum RMS time for prompt candidates
 prompt_nhits_min = 150 # Minimum number of hits for prompt candidates
 prompt_nhits_max = 300 # Maximum number of hits for prompt candidates
 coincidence_window = 150000  # Window for coincidence search
-delayed_window = 100  # Window for delayed candidates
+delayed_window = 40  # Window for delayed candidates
 delayed_nhits_min = 10  # Minimum number of hits for delayed candidates
 delayed_nhits_max = 30  # Maximum number of hits for delayed candidates
 ### Accidentals
-nBG = 5 # Number of accidental windows to search
+nBG = 10 # Number of accidental windows to search
 deltat_vp = 50000 #ms Time difference for accidental search
 
 print("Opening Files...")
@@ -67,7 +68,7 @@ with open(f'{output_path}filtered_files/filtered_file_{run_number}.pkl', 'rb') a
 #    data = pickle.load(f)
     data = Numpy2to1Unpickler(f).load()
 
-neutron_df = pd.read_csv(f'{output_path}AmBeCandidates/neutron_candidates_{run_number}.csv')
+neutron_df = pd.read_csv(f'{output_path}AmBeCandidates/neutron_candidates_{run_number}_test.csv')
 
 times_vals = data["times_TOF"]["values"]
 times_offs = data["times_TOF"]["offsets"]
@@ -112,6 +113,7 @@ neutron_df = neutron_df.sort_values('prompt_time').reset_index(drop=True)
 # compute differences between consecutive prompt_time values
 #neutron_df['dt'] = neutron_df['prompt_time'].diff()
 
+# Windows Method (1)###################################################################
 neutron_df['dt'] = 270000 - neutron_df['prompt_time']
 
 
@@ -121,10 +123,25 @@ vp_times_by_event = {}
 for event, group in neutron_df.loc[mask].groupby('event_number'):
     t0 = group['prompt_time'].iloc[0]   # or use .min() if preferred
     vp_times_by_event[event] = [t0 + j * deltat_vp for j in range(nBG)]
+########################################################################################
 
+# No Windows Method (2)########################################################################################
+#neutron_events = set(neutron_df['event_number'].values)
+#all_events = set(range(N_events))
+
+#missing_events = list(all_events - neutron_events)
+#acc_windows = len(neutron_events)*nBG
+#sampled_missing = random.sample(missing_events, acc_windows)
+
+#vp_times_by_event = {}
+#for event in sampled_missing:
+#    vp_times_by_event[event] = np.random.uniform(0, 120000)
+########################################################################################
+    
 print(f"Total vp windows found: {len(vp_times_by_event)}")
 print("Running accidental search...")
 vp_neutron_dict = functions_coincidence.accidentals_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, vp_times_by_event, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
+#vp_neutron_dict = functions_coincidence.accidentals_wBonsai(sampled_missing, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, vp_times_by_event, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
 
 print("VP Neutron candidates", len(vp_neutron_dict))
 
@@ -147,7 +164,8 @@ df_vp_neutron_candidates = pd.concat(
 #    ignore_index=True
 #)
 
-df_vp_neutron_candidates.to_csv(f'{output_path}/AmBeCandidates/accidental_candidates_{run_number}.csv', index=False)
+df_vp_neutron_candidates.to_csv(f'{output_path}/AmBeCandidates/accidental_candidates_{run_number}_40ns.csv', index=False)
+#df_vp_neutron_candidates.to_csv(f'{output_path}/AmBeCandidates/accidental_candidates_noWindow_{run_number}.csv', index=False)
 
 
 print("CSV files saved.")
