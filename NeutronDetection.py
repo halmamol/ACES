@@ -44,10 +44,10 @@ parser.add_argument(
 
 # Arguments for Analysis 
 run_number = "2384"  # Run number
-output_path = "/scratch/halmazan/WCTE/files/data/"
+output_path = "/data/halmazan/WCTE/data/"
 
 input_file = f'{output_path}filtered_files/filtered_file_{run_number}.pkl'
-output_file = f'{output_path}/AmBeCandidates/neutron_candidates_{run_number}_promptvar_neutronsel_test2.csv'
+output_file = f'/scratch/halmazan/WCTE/files/AmBeCandidates/neutron_candidates_{run_number}_promptvar_neutronsel_test2_mult.csv'
 
 prompt_window = 1500  # Window for prompt candidates
 prompt_dead_time = 200  # Death time for prompt candidates
@@ -143,13 +143,14 @@ df_gamma_candidates = pd.concat(
     ignore_index=True
 )
 
-df_gamma_candidates.to_csv(f'{output_path}/AmBeCandidates/gamma_candidates_{run_number}_promptvar_neutronsel_test2.csv', index=False)
+df_gamma_candidates.to_csv(f'/scratch/halmazan/WCTE/files/AmBeCandidates/gamma_candidates_{run_number}_promptvar_neutronsel_test2_mult.csv', index=False)
 
 # Neutron detection ###########################################################################################################
 prompt_candidates = sum(len(v) for v in threshold_times_prompt.values())
 print("Prompt candidates before neutron search", prompt_candidates)
 print("Searching for neutron events...")
-neutron_dict = functions_coincidence.neutron_detection_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
+#neutron_dict = functions_coincidence.neutron_detection_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
+neutron_dict = functions_coincidence.neutron_detection_wMulti(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
 
 prompt_candidates_wpair = sum(len(v) for v in threshold_times_prompt.values())
 delayed_candidates =  sum(len(v) for v in neutron_dict.values())
@@ -179,7 +180,7 @@ df_summary = pd.DataFrame([{
 }])
 
 # Save summary to its own CSV
-df_summary.to_csv(f'{output_path}/AmBeCandidates/summary_{run_number}_promptvar_neutronsel_test2.csv', index=False)
+df_summary.to_csv(f'/scratch/halmazan/WCTE/files/AmBeCandidates/summary_{run_number}_promptvar_neutronsel_test2_mult.csv', index=False)
 
 
 print("CSV files saved.")
