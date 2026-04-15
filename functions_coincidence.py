@@ -4,6 +4,7 @@ import json
 
 import functions_bonsai
 import functions_multilateration
+import functions_analysis
 
 
 def nHitsTimeWindow(times_branch_event_arg, threshold_inf, window, death_window, charge_branch_event = [], threshold_sup = np.inf):
@@ -635,9 +636,11 @@ def neutron_detection_wMulti(event_branch, times_branch_arg, charge_branch_arg, 
             if (event_number == 6621):
                 #print(times_in_delayed, charges_in_delayed, mpmt_in_delayed, pmt_in_delayed)
                 continue
-            
-            vertex = functions_multilateration.run_multilateration_candidate(times_in_delayed, mpmt_in_delayed, pmt_in_delayed, sigma_t=1.0)
+            t_in = np.min(times_in_delayed)
 
+            t_rms = functions_analysis.time_RMS_fun_time(times_in_delayed, t_in, window_neutron)
+            #vertex = functions_multilateration.run_multilateration_candidate(times_in_delayed, mpmt_in_delayed, pmt_in_delayed, sigma_t=1.0)
+            vertex = functions_multilateration.run_grid_vertex_candidate(times_in_delayed, mpmt_in_delayed, pmt_in_delayed)
             #print('vertex okay, saving info')
             valid_thresholds.append(
                 {
@@ -652,10 +655,13 @@ def neutron_detection_wMulti(event_branch, times_branch_arg, charge_branch_arg, 
                     'prompt_mpmt': mpmt_prompt,
                     'prompt_pmt': pmt_prompt,
                     "delayed_time": float(time_delayed),
+                    #"delayed_trms":float(t_rms),
+                    "delayed_trms": vertex["trms"],
                     "delayed_nhits": delayed_nhits,
                     "delayed_x": vertex["x"],
                     "delayed_y": vertex["y"],
                     "delayed_z": vertex["z"],
+                    "vertex_chi2": vertex["chi2_ndof"],
                 }
             )
             print("  picked delayed", time_delayed, "-> lockout", time_delayed + window_neutron)

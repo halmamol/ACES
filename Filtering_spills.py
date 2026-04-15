@@ -2,7 +2,6 @@ print("Starting Spills Filter Algorithm")
 
 import uproot
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 import functions_spills
 import glob
@@ -25,7 +24,7 @@ args = parser.parse_args()
 partition = args.partition
 
 # Other arguments for the analysis
-run_number = "2388"  # Run number
+run_number = "2386"  # Run number
 nhits_threshold = 300  # Threshold for nHits
 nhits_window = 5000  # Window for nHits
 death_time = 6000  # Death time for nHits
@@ -33,7 +32,7 @@ death_time = 6000  # Death time for nHits
 # Paths for files #############################################################################################
 root_dir = f"/scratch/halmazan/WCTE/files/data/{run_number}/"
 root_file_path = f"{root_dir}WCTE_offline_R{run_number}S0P{partition}.root"
-output_path = f"//scratch/halmazan/WCTE/files/data/filtered_files/"
+output_path = f"/scratch/halmazan/WCTE/files/filtered_files/"
 
 # Showing results
 if partition == "all":
@@ -127,8 +126,8 @@ payload = {
     },
 }
 
-with open(f'{output_path}filtered_file_{run_number}.pkl', 'wb') as f:
+with open(f'{output_path}filtered_file_{run_number}_noTOF.pkl', 'wb') as f:
     pickle.dump(payload, f)
 
 print(f"Saved single consolidated file:")
-print(f" - {output_path}filtered_file_{run_number}.pkl (contains times_TOF, charge, mpmt_id, metadata)")
+print(f" - {output_path}filtered_file_{run_number}_noTOF.pkl (contains times_TOF, charge, mpmt_id, metadata)")

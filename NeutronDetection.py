@@ -43,7 +43,7 @@ parser.add_argument(
 )
 
 # Arguments for Analysis 
-run_number = "2384"  # Run number
+run_number = "2386"  # Run number
 output_path = "/data/halmazan/WCTE/data/"
 
 input_file = f'{output_path}filtered_files/filtered_file_{run_number}.pkl'
