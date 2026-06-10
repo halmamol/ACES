@@ -3,7 +3,74 @@ import glob
 import os
 #import uproot
 import pandas as pd
+import json
 from collections import defaultdict
+
+def load_pmt_positions(json_path):
+    """
+    Load PMT positions from the WCTE geometry JSON.
+    Returns dict: pmt_id → np.array([x, y, z]) in mm.
+    """
+    with open(json_path, "r") as f:
+        geo_data = json.load(f)
+
+    mpmt_data = geo_data.get("mpmts", {})
+    pmt_positions = {}
+
+    for mpmt_idx in sorted(mpmt_data.keys(), key=int):
+        mpmt = mpmt_data[mpmt_idx]
+        pmts = mpmt.get("pmts", {})
+        for pmt_idx in sorted(pmts.keys(), key=int):
+            pmt = pmts[pmt_idx]
+            location = pmt["placement"]["location"]
+            pmt_id = int(mpmt_idx) * 19 + int(pmt_idx)
+            pmt_positions[pmt_id] = np.array(location, dtype=np.float64)
+
+    return pmt_positions
+
+
+def build_tof_map(pmt_positions, source_position, n_water=1.33):
+    """
+    Precompute ToF [ns] from a source position to every PMT.
+
+    Parameters
+    ----------
+    pmt_positions    : dict {pmt_id: np.array([x,y,z])} in mm
+    source_position  : np.array([x,y,z]) in mm
+    n_water          : refractive index of water
+
+    Returns
+    -------
+    tof_map : dict {pmt_id: tof_ns}
+    """
+    c_water_mm_ns = (3e8 / n_water) * 1e-6  # mm/ns
+    source = np.array(source_position, dtype=np.float64)
+
+    tof_map = {}
+    for pmt_id, pos in pmt_positions.items():
+        dist = np.linalg.norm(pos - source)
+        tof_map[pmt_id] = dist / c_water_mm_ns
+
+    return tof_map
+
+
+def read_mpmt_offsets(json_path):
+    """
+    Read the mPMT ToF offset map (legacy format, keyed by 'slot*100+pos').
+    Returns dict: (slot, pos) → tof_ns.
+    """
+    with open(json_path, "r") as f:
+        raw = json.load(f)
+
+    mpmt_map = {}
+    for key, val in raw.items():
+        k = int(key)
+        slot = k // 100
+        pos  = k % 100
+        mpmt_map[(slot, pos)] = val
+
+    return mpmt_map
+
 
 def a_lista_de_arrays(plano, indices):
     return [plano[indices[i]:indices[i+1]] for i in range(len(indices)-1)]
@@ -91,8 +158,9 @@ def time_RMS_fun_time(times_event, t_in, window):
     times_bin = times_event[mask]
     mean_t = times_bin.mean()
     RMS = np.sqrt(np.mean((times_bin - mean_t) ** 2))
+    mean_t_rel = (times_bin - t_in).mean()
     
-    return RMS
+    return RMS, mean_t_rel
 
 
 if __name__ == "__main__":

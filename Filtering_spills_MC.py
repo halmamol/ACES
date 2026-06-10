@@ -24,17 +24,15 @@ args = parser.parse_args()
 partition = args.partition
 
 # Other arguments for the analysis
-run_number = "2390"  # Run number
-drun = "2390"
+run_number = "2386"  # Run number
 nhits_threshold = 300  # Threshold for nHits
 nhits_window = 5000  # Window for nHits
 death_time = 6000  # Death time for nHits
 
-version = 'v0_5'
-
 # Paths for files #############################################################################################
-root_dir = f"/data/halmazan/WCTE/data/{run_number}/{version}/"
-root_file_path = f"{root_dir}WCTE_offline_R{run_number}S0P{partition}.root"
+root_dir = f"/data/halmazan/WCTE/MC/"
+root_file_path = f"{root_dir}wcte_ambe_mc_digidata_NEW_0.root" #wcte_ambe_mc_digidata_0.root
+#root_file_path = f"{root_dir}WCTE_offline_R{run_number}S0P{partition}.root"
 output_path = f"/scratch/halmazan/WCTE/files/filtered_files/"
 
 source_pos = []
@@ -48,23 +46,43 @@ sources_pos = {
 if run_number in sources_pos.keys():
     source_pos = sources_pos[run_number]
 else:
-    source_pos = sources_pos[drun]
+    print('Run not on list')
 
+#root_files = glob.glob(os.path.join(root_dir, "*.root"))
 # Showing results
-if partition == "all":
-    print("Analysing all partitions.")
+#if len(root_files) == 0:
+#    raise FileNotFoundError(f"No .root files found in {root_dir}")
+#if len(root_files) > 1:
+#    print(f"Warning: found {len(root_files)} files, using the first one")
 
-    print(f"Loading Run {run_number}...")
-    root_files = sorted(glob.glob(os.path.join(root_dir, "*.root")))
-    root_files = sorted(root_files, key=lambda file_path: int(file_path.split("P")[-1].split(".")[0]))
-    root_files = root_files[:-1]
+file_path = root_file_path
 
-    print(f"Found {len(root_files)} ROOT files.")
+times_branch_sorted = []
+times_branch_sorted_TOF = []
+charge_branch_sorted = []
+mpmt_id_branch_sorted = []
+pmt_id_branch_sorted = []
+event_number_branch = []
 
-    times_branch_sorted, times_branch_sorted_TOF, charge_branch_sorted, mpmt_id_branch_sorted, pmt_id_branch_sorted, event_number_branch, _ = functions_spills.multiple_partition(root_files, source_pos)
+# Contador global de eventos
+event_offset = 0
 
-    print("Runs loaded.")
-    N_events = max(event_number_branch) + 1
+print(f"Procesando archivo: {file_path}")
+file = uproot.open(file_path)
+tree = file["WCTEReadoutWindows"]
+
+#times_branch_sorted_i, times_branch_sorted_TOF_i, charge_branch_sorted_i, mpmt_id_branch_sorted_i, pmt_id_branch_sorted_i, event_number_branch_i = functions_spills.initial_treatment(tree)
+times_branch_sorted_i, times_branch_sorted_TOF_i, charge_branch_sorted_i, mpmt_id_branch_sorted_i, pmt_id_branch_sorted_i, event_number_branch_i = functions_spills.initial_treatment(tree, source_pos)
+
+times_branch_sorted.extend(times_branch_sorted_i)
+times_branch_sorted_TOF.extend(times_branch_sorted_TOF_i)
+charge_branch_sorted.extend(charge_branch_sorted_i)
+mpmt_id_branch_sorted.extend(mpmt_id_branch_sorted_i)
+pmt_id_branch_sorted.extend(pmt_id_branch_sorted_i)
+event_number_branch.extend(event_number_branch_i)
+
+print("Runs loaded.")
+N_events = max(event_number_branch) + 1
 
 print(f"Total number of events in run {run_number}: {N_events}")
 
@@ -149,12 +167,8 @@ payload = {
     },
 }
 
-if run_number == '2384':
-    with open(f'{output_path}filtered_file_{run_number}_{version}_wTOF{drun}.pkl', 'wb') as f:
-        pickle.dump(payload, f)
-else:
-    with open(f'{output_path}filtered_file_{run_number}_{version}_wTOF.pkl', 'wb') as f:
-        pickle.dump(payload, f)
+with open(f'{output_path}filtered_file_MC_{run_number}_digidata_noTOF.pkl', 'wb') as f:
+    pickle.dump(payload, f)
 
 print(f"Saved single consolidated file:")
-print(f" - {output_path}filtered_file_{run_number}_wTOF.pkl (contains times_TOF, charge, mpmt_id, metadata)")
+print(f" - {output_path}filtered_file_MC_noTOF.pkl (contains times_TOF, charge, mpmt_id, metadata)")

@@ -6,13 +6,10 @@ import numpy as np
 import pandas as pd
 import functions_coincidence
 import functions_analysis
-import functions_spills
 import glob
 import os
-import json
 import argparse
 import pickle
-import awkward as ak
 
 class Numpy2to1Unpickler(pickle.Unpickler):
     MAP = {
@@ -45,21 +42,24 @@ parser.add_argument(
 )
 
 # Arguments for Analysis 
-run_number = "2384"  # Run number
-drun = "2386"
+run_number = "2386"  # Run number
 output_path = "/scratch/halmazan/WCTE/files/"
 
-version = 'v0_5'
+input_file = f'{output_path}filtered_files/filtered_file_MC_{run_number}_digidata_noTOF.pkl'
+title = f'_{run_number}_prompt50threshold_prompt1000window_neutronsel_mult_wtfilter_w10ns_mtrms10_window100mus'
+output_file = f'/scratch/halmazan/WCTE/files/AmBeCandidates/neutron_candidates_MC{title}.csv'
 
-
-title = f'{version}_prompt30threshold_prompt1000window_neutronsel_mult_wtfilter_w10ns_mtrms10_wTOF'
-
-if run_number == '2384':
-    input_file = f'{output_path}filtered_files/filtered_file_{run_number}_{version}_wTOF{drun}.pkl'
-    output_file = f'/scratch/halmazan/WCTE/files/AmBeCandidates/neutron_candidates_{run_number}_{title}{drun}.csv'
-else:
-    input_file = f'{output_path}filtered_files/filtered_file_{run_number}_{version}_wTOF.pkl'
-    output_file = f'/scratch/halmazan/WCTE/files/AmBeCandidates/neutron_candidates_{run_number}_{title}.csv'
+prompt_window = 1000  # Window for prompt candidates
+prompt_dead_time = 200  # Death time for prompt candidates
+prompt_t_rms_min = 200 # Minimum RMS time for prompt candidates
+prompt_t_rms_max = 500 # Maximum RMS time for prompt candidates #400
+prompt_nhits_min = 50 # Minimum number of hits for prompt candidates #150
+prompt_nhits_max = 300 # Maximum number of hits for prompt candidates
+afterpulse_time = 5000
+coincidence_window = 150000  # Window for coincidence search
+delayed_window = 10  # Window for delayed candidates
+delayed_nhits_min = 10  # Minimum number of hits for delayed candidates
+delayed_nhits_max = 50  # Maximum number of hits for delayed candidates
 
 source_pos = []
 sources_pos = {
@@ -72,20 +72,7 @@ sources_pos = {
 if run_number in sources_pos.keys():
     source_pos = sources_pos[run_number]
 else:
-    source_pos = sources_pos[drun]
-
-prompt_window = 1000  # Window for prompt candidates
-prompt_dead_time = 200  # Death time for prompt candidates
-prompt_t_rms_min = 200 # Minimum RMS time for prompt candidates
-prompt_t_rms_max = 500 # Maximum RMS time for prompt candidates #400
-prompt_nhits_min = 30 # Minimum number of hits for prompt candidates #150
-prompt_nhits_max = 300 # Maximum number of hits for prompt candidates
-afterpulse_time = 5000
-coincidence_window = 150000  # Window for coincidence search
-delayed_window = 10  # Window for delayed candidates
-delayed_nhits_min = 10  # Minimum number of hits for delayed candidates
-delayed_nhits_max = 50  # Maximum number of hits for delayed candidates
-
+    print('Run not on list')
 
 print("Opening: ", input_file)
 print("Output saved in: ", output_file)
@@ -114,6 +101,7 @@ pmt_per_event   = unfold(pmt_vals,   pmt_offs)
 print("Filtered data loaded.")
 N_events = len(times_per_event)
 
+
 print(f"Number of events in run {run_number}", N_events)
 
 
@@ -122,10 +110,10 @@ event_number_branch = np.arange(0, N_events, 1)
 # Prompt candidates detection ###########################################################################################################
 
 print("Searching prompt candidate events...")
-
 threshold_times_prompt = functions_coincidence.prompt_candidates_wBonsai(event_number_branch, times_per_event_TOF, charge_per_event, mpmt_per_event, pmt_per_event, prompt_window, prompt_dead_time, prompt_nhits_min, prompt_nhits_max)
-
-gamma_info_prompt = {}
+#threshold_times_prompt = functions_coincidence.prompt_candidates(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, prompt_window, prompt_dead_time, prompt_nhits_min, prompt_nhits_max)
+#threshold_times_prompt = functions_coincidence.prompt_candidates(event_number_branch, times_per_event, prompt_window, prompt_dead_time, prompt_nhits_min, prompt_nhits_max)
+gamma_info_prompt = {}  # separate dict
 
 for event, candidates in threshold_times_prompt.items():
     times_event_tof = times_per_event_TOF[event]
@@ -163,8 +151,7 @@ for event, candidates in threshold_times_prompt.items():
             times_event_tof, t_in, prompt_window
         )
 
-        #if prompt_t_rms_min <= t_rms <= prompt_t_rms_max:
-        if prompt_t_rms_min <= t_rms <= prompt_t_rms_max and t_mean < (prompt_window-prompt_t_rms_max):
+        if prompt_t_rms_min <= t_rms <= prompt_t_rms_max:
             filtered.append((
                 t_in,
                 n_hits,
@@ -197,7 +184,7 @@ for event, candidates in threshold_times_prompt.items():
 
     threshold_times_prompt[event] = filtered
     gamma_info_prompt[event] = gamma_info
-       
+    
 print("Prompt candidates found in run.")
 
 df_gamma_candidates = pd.concat(
@@ -205,12 +192,17 @@ df_gamma_candidates = pd.concat(
     ignore_index=True
 )
 
-df_gamma_candidates.to_csv(f'/scratch/halmazan/WCTE/files/AmBeCandidates/gamma_candidates_{run_number}_{title}.csv', index=False)
+df_gamma_candidates.to_csv(f'/scratch/halmazan/WCTE/files/AmBeCandidates/gamma_candidates_MC{title}.csv', index=False)
 
 # Neutron detection ###########################################################################################################
 prompt_candidates = sum(len(v) for v in threshold_times_prompt.values())
 print("Prompt candidates before neutron search", prompt_candidates)
 print("Searching for neutron events...")
+#neutron_dict = functions_coincidence.neutron_detection_wBonsai(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
+#neutron_dict = functions_coincidence.neutron_detection_wMulti_alln(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, prompt_window)
+
+#neutron_dict = functions_coincidence.neutron_detection_wMulti_wtcut(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, afterpulse_time)
+#neutron_dict = functions_coincidence.neutron_detection_wMulti_clean(event_number_branch, times_per_event, charge_per_event, mpmt_per_event, pmt_per_event, threshold_times_prompt, coincidence_window, delayed_window, delayed_nhits_min, delayed_nhits_max, afterpulse_time)
 
 neutron_dict = functions_coincidence.neutron_detection_wMulti_wtcut(
     event_branch=event_number_branch,
@@ -255,7 +247,7 @@ df_summary = pd.DataFrame([{
 }])
 
 # Save summary to its own CSV
-df_summary.to_csv(f'/scratch/halmazan/WCTE/files/AmBeCandidates/summary_{run_number}_{title}.csv', index=False)
+df_summary.to_csv(f'/scratch/halmazan/WCTE/files/AmBeCandidates/summary_MC{title}.csv', index=False)
 
 
 print("CSV files saved.")

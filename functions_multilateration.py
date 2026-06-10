@@ -137,9 +137,6 @@ def run_multilateration_candidate(
         "result": result,
     }
 
-    import numpy as np
-import functions_bonsai
-
 def run_grid_vertex_candidate(
     times, mpmt_ids, pmt_ids,
     *,

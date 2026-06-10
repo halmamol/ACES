@@ -1,9 +1,10 @@
 import uproot
 import awkward as ak
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 import numpy as np
 import pandas as pd  
+import functions_analysis
 import json
 
 #import functions_bonsai
@@ -90,6 +91,7 @@ def repeat_spills_nHits(event_number_branch, times_branch_sorted, threshold, win
 def repeat_spills_nHits_with_channels(
     event_number_branch,
     times_branch_sorted_TOF,
+    times_branch_sorted,
     charge_branch_sorted,
     mpmt_id_branch_sorted,
     pmt_id_branch_sorted,
@@ -97,45 +99,35 @@ def repeat_spills_nHits_with_channels(
     window,
     death_window,
 ):
-    """
-    Apply spill_nHitsTT repeatedly per event and delete hits across times (TOF), charge,
-    and mpmt_id arrays in lockstep using the same indices.
-
-    Returns:
-        times_branch_modified_TOF: list[np.ndarray]
-        charge_branch_modified: list[np.ndarray]
-        mpmt_id_branch_modified: list[np.ndarray]
-        threshold_times: dict[event_id -> list[thresholds]]
-        deleted_indices_by_event: dict[event_id -> list[int]] (indices in original event arrays)
-    """
     import numpy as np
 
     times_branch_modified_TOF = []
+    times_branch_modified = []
     charge_branch_modified = []
     mpmt_id_branch_modified = []
-    pmt_id_branch_modified = []  
+    pmt_id_branch_modified = []
     threshold_times = {}
     deleted_indices_by_event = {}
 
-    for event in event_number_branch:
+    for i, event in enumerate(event_number_branch):
         if event % 1000 == 0:
             print(f"Filtering nHits event {event}...")
 
-        t_orig = times_branch_sorted_TOF[event]
-        c_orig = charge_branch_sorted[event]
-        m_orig = mpmt_id_branch_sorted[event]
-        p_orig = pmt_id_branch_sorted[event]
+        t_tof_orig = times_branch_sorted_TOF[i]
+        t_orig = times_branch_sorted[i]
+        c_orig = charge_branch_sorted[i]
+        m_orig = mpmt_id_branch_sorted[i]
+        p_orig = pmt_id_branch_sorted[i]
 
-        # Ensure arrays are aligned
-        if not (len(t_orig) == len(c_orig) == len(m_orig) == len(p_orig)):
+        if not (len(t_tof_orig) == len(t_orig) == len(c_orig) == len(m_orig) == len(p_orig)):
             raise ValueError(
                 f"Event {event}: arrays have mismatched lengths "
-                f"(times={len(t_orig)}, charge={len(c_orig)}, mpmt_id={len(m_orig)}, pmt_id={len(p_orig)})"
+                f"(times_tof={len(t_tof_orig)}, times={len(t_orig)}, "
+                f"charge={len(c_orig)}, mpmt_id={len(m_orig)}, pmt_id={len(p_orig)})"
             )
 
-        remaining_times = t_orig.copy()
-        # idx_map maps indices in 'remaining_times' to indices in the original arrays
-        idx_map = np.arange(len(t_orig))
+        remaining_times = t_tof_orig.copy()
+        idx_map = np.arange(len(t_tof_orig))
 
         all_thresholds = []
         all_deleted_orig_indices = []
@@ -146,14 +138,12 @@ def repeat_spills_nHits_with_channels(
                 remaining_times, threshold, window, death_window
             )
 
-            if not new_thresholds:
+            if len(new_thresholds) == 0:
                 break
 
-            # Map deletions to original indices BEFORE deleting
             orig_indices = idx_map[indices_to_delete]
             all_deleted_orig_indices.extend(orig_indices.tolist())
 
-            # Delete from the working arrays
             remaining_times = np.delete(remaining_times, indices_to_delete)
             idx_map = np.delete(idx_map, indices_to_delete)
 
@@ -163,20 +153,16 @@ def repeat_spills_nHits_with_channels(
         if pass_counter > 1:
             print(f"Event {event}: spill_nHitsTT applied {pass_counter} times")
 
-        # Build keep mask for original arrays
+        keep_mask = np.ones(len(t_tof_orig), dtype=bool)
         if all_deleted_orig_indices:
-            keep_mask = np.ones(len(t_orig), dtype=bool)
             keep_mask[all_deleted_orig_indices] = False
-        else:
-            keep_mask = np.ones(len(t_orig), dtype=bool)
 
-        # Append filtered arrays
-        times_branch_modified_TOF.append(t_orig[keep_mask])
+        times_branch_modified_TOF.append(t_tof_orig[keep_mask])
+        times_branch_modified.append(t_orig[keep_mask])
         charge_branch_modified.append(c_orig[keep_mask])
         mpmt_id_branch_modified.append(m_orig[keep_mask])
-        pmt_id_branch_modified.append(p_orig[keep_mask])  # Not returned but could be if needed
+        pmt_id_branch_modified.append(p_orig[keep_mask])
 
-        # Metadata
         if all_thresholds:
             threshold_times[event] = all_thresholds
         if all_deleted_orig_indices:
@@ -184,6 +170,7 @@ def repeat_spills_nHits_with_channels(
 
     return (
         times_branch_modified_TOF,
+        times_branch_modified,
         charge_branch_modified,
         mpmt_id_branch_modified,
         pmt_id_branch_modified,
@@ -253,14 +240,14 @@ def plot_TotalCharge_mPMT(mpmt_id, charge):
     charges = [charge_per_mpmt[m] for m in mpmt_ids]
 
     # Step 3: Plot
-    plt.figure(figsize=(8, 4))
-    plt.bar(mpmt_ids, charges, width = 1, color='blue',  align='edge', edgecolor='navy')
-    plt.xlim(0, 150)
-    plt.xlabel("mPMT ID")
-    plt.ylabel("Total Charge [u.a]")
-    plt.title("Charge per mPMT in 50 ns window")
-    plt.tight_layout()
-    plt.show()
+    #plt.figure(figsize=(8, 4))
+    #plt.bar(mpmt_ids, charges, width = 1, color='blue',  align='edge', edgecolor='navy')
+    #plt.xlim(0, 150)
+    #plt.xlabel("mPMT ID")
+    #plt.ylabel("Total Charge [u.a]")
+    #plt.title("Charge per mPMT in 50 ns window")
+    #plt.tight_layout()
+    #plt.show()
 
 def plot_TotalCharge_Time(time, charge, bin_time, total_time):
 
@@ -322,7 +309,7 @@ def correction_TOF(mpmt_map, mpmt_slot_branch, pmt_position, max_slot = 106, max
 
     return corrections
 
-def initial_treatment(tree):
+def initial_treatment(tree, source_pos):
 
     times_branch = tree["hit_pmt_calibrated_times"].array()
     charge_branch = tree["hit_pmt_charges"].array()
@@ -330,20 +317,51 @@ def initial_treatment(tree):
     pmt_position = tree["hit_pmt_position_ids"].array()
     event_number_branch = tree["event_number"].array(library="np")
     hit_cards_id = tree["hit_mpmt_card_ids"].array()
-    has_time_cte = tree["hit_pmt_has_time_constant"].array()
+    #has_time_cte = tree["hit_pmt_has_time_constant"].array()
 
     # Crear una máscara booleana por evento donde ambos valores sean >= 0
-    valid_mask = (mpmt_slot_branch >= 0) & (pmt_position >= 0) & (charge_branch < 1e4) & (hit_cards_id < 120) &  (has_time_cte != 0)
-
+    #valid_mask = (mpmt_slot_branch >= 0) & (pmt_position >= 0) & (charge_branch < 1e4) & (hit_cards_id < 120) &  (has_time_cte != 0)
+    valid_mask = (
+        (mpmt_slot_branch >= 0) & (mpmt_slot_branch < 106) &
+        (pmt_position >= 0) & (pmt_position < 19) &
+        (charge_branch < 1e4) &
+        (hit_cards_id < 120) #&
+        #(has_time_cte != 0)
+    )
     # Aplicar la máscara a cada rama para eliminar los hits inválidos
     times_branch_clean = times_branch[valid_mask]
     charge_branch_clean = charge_branch[valid_mask]
     mpmt_slot_branch_clean = mpmt_slot_branch[valid_mask]
     pmt_position_clean = pmt_position[valid_mask]
 
-    mpmt_map = read_mpmt_offsets("/scratch/halmazan/WCTE/WCTECoincidence_Analysis/Complete_analysis/mpmt_tof_pos1.json")
-    corrections = correction_TOF(mpmt_map, mpmt_slot_branch_clean, pmt_position_clean)
-    corrected_times = times_branch_clean - corrections
+    print("Loading PMT geometry and building ToF map...")
+    pmt_positions = functions_analysis.load_pmt_positions("/data/halmazan/WCTE/wcte_v11_20250513.json")
+    tof_map = functions_analysis.build_tof_map(pmt_positions, source_pos, 1.333)
+    print(f"  {len(pmt_positions)} PMTs, source at {source_pos}")
+
+    max_slot=106
+    max_pos=19
+    if tof_map is not None:
+        lookup = np.zeros((max_slot, max_pos))
+        for pmt_id, tof in tof_map.items():
+            slot = pmt_id // 19
+            pos  = pmt_id % 19
+            if slot < max_slot and pos < max_pos:
+                lookup[slot, pos] = tof
+
+    # Apply ToF correction
+    if tof_map is not None:
+        flat_slots = ak.to_numpy(ak.ravel(mpmt_slot_branch_clean))
+        flat_pos = ak.to_numpy(ak.ravel(pmt_position_clean))
+        flat_corr = lookup[flat_slots, flat_pos]
+        corrections = ak.unflatten(flat_corr, ak.num(mpmt_slot_branch_clean))
+        corrected_times = times_branch_clean - corrections
+    else:
+        corrected_times = times_branch_clean
+
+    #mpmt_map = read_mpmt_offsets("/data/halmazan/WCTE/mpmt_tof_pos1.json")
+    #corrections = correction_TOF(mpmt_map, mpmt_slot_branch_clean, pmt_position_clean)
+    #corrected_times = times_branch_clean - corrections
     
     # Ordenar los tiempos por evento y obtener los índices
     sorted_idx = ak.argsort(corrected_times, axis=1)
@@ -402,7 +420,7 @@ def counting_nHits_window(event_number_branch, times_branch, bin_window):
     return nHits
 
 
-def multiple_partition(root_files):
+def multiple_partition(root_files, source_pos):
 
     times_branch_sorted = []
     times_branch_sorted_TOF = []
@@ -420,7 +438,7 @@ def multiple_partition(root_files):
         file = uproot.open(file_path)
         tree = file["WCTEReadoutWindows"]
 
-        times_branch_sorted_i, times_branch_sorted_TOF_i, charge_branch_sorted_i, mpmt_id_branch_sorted_i, pmt_id_branch_sorted_i, event_number_branch_i = initial_treatment(tree)
+        times_branch_sorted_i, times_branch_sorted_TOF_i, charge_branch_sorted_i, mpmt_id_branch_sorted_i, pmt_id_branch_sorted_i, event_number_branch_i = initial_treatment(tree, source_pos)
         
         dir_event_partition[int(file_path.split("P")[-1].split(".")[0])] = len(event_number_branch_i)
         # Ajustar los event_numbers con offset para que no se repitan
