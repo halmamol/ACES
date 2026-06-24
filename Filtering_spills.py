@@ -24,8 +24,8 @@ args = parser.parse_args()
 partition = args.partition
 
 # Other arguments for the analysis
-run_number = "2390"  # Run number
-drun = "2390"
+run_number = "2384"  # Run number
+drun = "2386"
 nhits_threshold = 300  # Threshold for nHits
 nhits_window = 5000  # Window for nHits
 death_time = 6000  # Death time for nHits
@@ -39,11 +39,18 @@ output_path = f"/scratch/halmazan/WCTE/files/filtered_files/"
 
 source_pos = []
 sources_pos = {
-    '2386': [0.0, +30.5, 0.0],
-    '2387': [0.0, -30.5, 0.0],
-    '2388': [0.0, -58.5, 0.0],
-    '2389': [-47.64, +30.5, 29.17],
-    '2390': [-47.64, -30.5, 29.17], 
+
+    '2386': [0.0, 729.725, 0.0],
+    '2387': [0.0, 119.725, 0.0],
+    '2388': [0.0, -160.275, 0.0],
+    '2389': [-476.4, 729.725, 291.7],
+    '2390': [-476.4, 119.725, 291.7],
+
+    #'2386': [0.0, +30.5, 0.0],
+    #'2387': [0.0, -30.5, 0.0],
+    #'2388': [0.0, -58.5, 0.0],
+    #'2389': [-47.64, +30.5, 29.17],
+    #'2390': [-47.64, -30.5, 29.17], 
 }
 if run_number in sources_pos.keys():
     source_pos = sources_pos[run_number]

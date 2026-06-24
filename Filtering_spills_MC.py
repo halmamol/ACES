@@ -31,17 +31,24 @@ death_time = 6000  # Death time for nHits
 
 # Paths for files #############################################################################################
 root_dir = f"/data/halmazan/WCTE/MC/"
-root_file_path = f"{root_dir}wcte_ambe_mc_digidata_NEW_0.root" #wcte_ambe_mc_digidata_0.root
+root_file_path = f"{root_dir}wcte_ambe_mc_digidata_{run_number}.root" #wcte_ambe_mc_digidata_0.root
 #root_file_path = f"{root_dir}WCTE_offline_R{run_number}S0P{partition}.root"
 output_path = f"/scratch/halmazan/WCTE/files/filtered_files/"
 
 source_pos = []
 sources_pos = {
-    '2386': [0.0, +30.5, 0.0],
-    '2387': [0.0, -30.5, 0.0],
-    '2388': [0.0, -58.5, 0.0],
-    '2389': [-47.64, +30.5, 29.17],
-    '2390': [-47.64, -30.5, 29.17], 
+
+    '2386': [0.0, 729.725, 0.0],
+    '2387': [0.0, 119.725, 0.0],
+    '2388': [0.0, -160.275, 0.0],
+    '2389': [-476.4, 729.725, 291.7],
+    '2390': [-476.4, 119.725, 291.7],
+
+    #'2386': [0.0, +30.5, 0.0],
+    #'2387': [0.0, -30.5, 0.0],
+    #'2388': [0.0, -58.5, 0.0],
+    #'2389': [-47.64, +30.5, 29.17],
+    #'2390': [-47.64, -30.5, 29.17], 
 }
 if run_number in sources_pos.keys():
     source_pos = sources_pos[run_number]

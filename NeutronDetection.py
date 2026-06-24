@@ -45,14 +45,14 @@ parser.add_argument(
 )
 
 # Arguments for Analysis 
-run_number = "2384"  # Run number
-drun = "2386"
+run_number = "2390"  # Run number
+drun = "2390"
 output_path = "/scratch/halmazan/WCTE/files/"
 
 version = 'v0_5'
 
 
-title = f'{version}_prompt30threshold_prompt1000window_neutronsel_mult_wtfilter_w10ns_mtrms10_wTOF'
+title = f'{version}_prompt50threshold_prompt1000window_tmeanlimits_neutronsel_mult_wtfilter_w10ns_mtrms10_wTOF'
 
 if run_number == '2384':
     input_file = f'{output_path}filtered_files/filtered_file_{run_number}_{version}_wTOF{drun}.pkl'
@@ -63,11 +63,17 @@ else:
 
 source_pos = []
 sources_pos = {
-    '2386': [0.0, +30.5, 0.0],
-    '2387': [0.0, -30.5, 0.0],
-    '2388': [0.0, -58.5, 0.0],
-    '2389': [-47.64, +30.5, 29.17],
-    '2390': [-47.64, -30.5, 29.17], 
+    '2386': [0.0, 729.725, 0.0],
+    '2387': [0.0, 119.725, 0.0],
+    '2388': [0.0, -160.275, 0.0],
+    '2389': [-476.4, 729.725, 291.7],
+    '2390': [-476.4, 119.725, 291.7],
+
+    #'2386': [0.0, +30.5, 0.0],
+    #'2387': [0.0, -30.5, 0.0],
+    #'2388': [0.0, -58.5, 0.0],
+    #'2389': [-47.64, +30.5, 29.17],
+    #'2390': [-47.64, -30.5, 29.17], 
 }
 if run_number in sources_pos.keys():
     source_pos = sources_pos[run_number]
@@ -78,7 +84,9 @@ prompt_window = 1000  # Window for prompt candidates
 prompt_dead_time = 200  # Death time for prompt candidates
 prompt_t_rms_min = 200 # Minimum RMS time for prompt candidates
 prompt_t_rms_max = 500 # Maximum RMS time for prompt candidates #400
-prompt_nhits_min = 30 # Minimum number of hits for prompt candidates #150
+prompt_t_mean_min = 200 # Minimum RMS time for prompt candidates
+prompt_t_mean_max = 400 # Maximum RMS time for prompt candidates #400
+prompt_nhits_min = 50 # Minimum number of hits for prompt candidates #150
 prompt_nhits_max = 300 # Maximum number of hits for prompt candidates
 afterpulse_time = 5000
 coincidence_window = 150000  # Window for coincidence search
@@ -164,7 +172,7 @@ for event, candidates in threshold_times_prompt.items():
         )
 
         #if prompt_t_rms_min <= t_rms <= prompt_t_rms_max:
-        if prompt_t_rms_min <= t_rms <= prompt_t_rms_max and t_mean < (prompt_window-prompt_t_rms_max):
+        if prompt_t_rms_min <= t_rms <= prompt_t_rms_max and prompt_t_mean_min < t_mean < prompt_t_mean_max:
             filtered.append((
                 t_in,
                 n_hits,

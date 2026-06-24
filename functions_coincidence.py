@@ -735,7 +735,8 @@ def neutron_detection_wMulti(event_branch, times_branch_arg, charge_branch_arg, 
             t_in = np.min(times_in_delayed)
 
             t_rms = functions_analysis.time_RMS_fun_time(times_in_delayed, t_in, window_neutron)
-            vertex = functions_multilateration.run_multilateration_candidate(times_in_delayed, mpmt_in_delayed, pmt_in_delayed, sigma_t=1.0)
+            #vertex = functions_multilateration.run_multilateration_candidate(times_in_delayed, mpmt_in_delayed, pmt_in_delayed, sigma_t=1.0)
+            vertex = functions_multilateration.run_multilateration_timecal(times_in_delayed, mpmt_in_delayed, pmt_in_delayed, sigma_t=1.0)
             #print('vertex okay, saving info')
             valid_thresholds.append(
                 {
@@ -1113,8 +1114,8 @@ def neutron_detection_wMulti_wtcut(
                     continue
 
                 # Reconstruct delayed vertex
-                vertex = functions_multilateration.run_multilateration_candidate(times_in_delayed_raw, mpmt_in_delayed, pmt_in_delayed, sigma_t=1.0)
-
+                #vertex = functions_multilateration.run_multilateration_candidate(times_in_delayed_raw, mpmt_in_delayed, pmt_in_delayed, sigma_t=1.0)
+                vertex = functions_multilateration.run_multilateration_timecal(times_in_delayed_raw, mpmt_in_delayed, pmt_in_delayed, sigma_t=1.0)
                 # If recon fails, skip
                 if not vertex.get("success", True):
                     continue
