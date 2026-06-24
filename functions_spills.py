@@ -6,8 +6,11 @@ import numpy as np
 import pandas as pd  
 import functions_analysis
 import json
+import sys
+import os
+sys.path.append(os.path.abspath("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk"))
 
-#import functions_bonsai
+# import ACES.functions_bonsai
 
 
 def spill_nHitsTT(times_branch_event_arg, threshold_inf, window, death_window, charge_branch_event = [], threshold_sup = np.inf):
@@ -410,7 +413,7 @@ def counting_nHits_window(event_number_branch, times_branch, bin_window):
         i=0
 
         while i<n:
-            
+
             t_in = times_branch_event[i]
             mask = (times_branch_event >= t_in) & (times_branch_event < t_in + bin_window)
             count = mask.sum()

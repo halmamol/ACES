@@ -3,6 +3,9 @@ print("Starting Spills Filter Algorithm")
 import uproot
 import numpy as np
 import pandas as pd
+import sys
+import os
+sys.path.append(os.path.abspath("/mnt/netapp2/Store_uni/home/usc/ie/dcr/software/hk"))
 import functions_spills
 import glob
 import os
